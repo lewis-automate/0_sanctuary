@@ -58,16 +58,23 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
 
   useEffect(() => {
     if (!tooltip) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (tooltipRef.current?.contains(e.target as Node)) return;
+    const dismiss = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (target && tooltipRef.current?.contains(target)) return;
       setTooltip(null);
       window.getSelection()?.removeAllRanges();
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handleMouseDown = (e: MouseEvent) => dismiss(e);
+    const handleTouchStart = (e: TouchEvent) => dismiss(e);
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("touchstart", handleTouchStart, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("touchstart", handleTouchStart);
+    };
   }, [tooltip]);
 
-  const handleMouseUp = useCallback(() => {
+  const showTooltipFromSelection = useCallback(() => {
     const selection = window.getSelection();
     if (!selection) return;
     const text = selection.toString().trim();
@@ -88,6 +95,17 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
       text,
     });
   }, []);
+
+  // Desktop: selection is available on mouseup. Mobile: selection is often
+  // committed only after touchend, so we read it after a short delay.
+  const handleMouseUp = useCallback(() => {
+    showTooltipFromSelection();
+  }, [showTooltipFromSelection]);
+
+  const handleTouchEnd = useCallback(() => {
+    // Let the browser commit the selection before we read it (iOS/Android).
+    setTimeout(showTooltipFromSelection, 150);
+  }, [showTooltipFromSelection]);
 
   const handleSaveVocab = useCallback(() => {
     if (tooltip) {
@@ -111,6 +129,7 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
         role="article"
         className={`mt-8 select-text space-y-6 text-slate-700 ${FONT_CLASSES[fontSize]}`}
         onMouseUp={handleMouseUp}
+        onTouchEnd={handleTouchEnd}
       >
         {story.body.split("\n\n").map((paragraph, i) => (
           <p key={i}>{paragraph}</p>
