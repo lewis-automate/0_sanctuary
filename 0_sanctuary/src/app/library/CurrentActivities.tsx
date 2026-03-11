@@ -99,7 +99,13 @@ export function CurrentActivities() {
               aria-hidden
             />
             <span className="text-sm text-slate-700">
-              {a.event_type === "story_gen" ? "Creating your story…" : "Processing…"}
+              {a.event_type === "story_gen"
+                ? "creating story..."
+                : a.event_type === "progress_update"
+                  ? "progressing reading session..."
+                  : a.event_type === "user_settings"
+                    ? "processing user settings..."
+                    : "Processing…"}
             </span>
           </div>
         ))}

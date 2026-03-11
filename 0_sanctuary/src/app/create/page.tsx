@@ -17,6 +17,8 @@ export default function CreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [swipeStarted, setSwipeStarted] = useState(false);
+  const [swipeDone, setSwipeDone] = useState(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -24,7 +26,11 @@ export default function CreatePage() {
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(id);
-          setSuccess(false);
+          // Clear all form inputs when countdown finishes
+          setTopic("");
+          setTone("");
+          setDifficulty(null);
+          setWordCount("");
           return 0;
         }
         return c - 1;
@@ -32,6 +38,34 @@ export default function CreatePage() {
     }, 1000);
     return () => clearInterval(id);
   }, [countdown]);
+
+  useEffect(() => {
+    if (!success) {
+      setSwipeStarted(false);
+      setSwipeDone(false);
+      return;
+    }
+
+    // Start swipe when countdown begins
+    if (countdown === COOLDOWN_SECONDS) {
+      setSwipeStarted(true);
+    }
+
+    // Start fade-out 1s before countdown ends and jump to top once screen is fully covered
+    if (countdown === 1 && !swipeDone) {
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
+      setSwipeDone(true);
+    }
+
+    // After countdown ends, hide overlay
+    if (countdown === 0 && swipeDone) {
+      setSuccess(false);
+      setSwipeStarted(false);
+      setSwipeDone(false);
+    }
+  }, [success, countdown, swipeDone]);
 
   const handleWordCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, "");
@@ -77,7 +111,7 @@ export default function CreatePage() {
             Choose a topic
           </label>
           <p className="mt-1 text-xs text-slate-500">
-            This is where you give direction to the topic. The what.
+            The what...
           </p>
           <div className="relative mt-3">
             <textarea
@@ -99,7 +133,7 @@ export default function CreatePage() {
             Tone or personality for the writer
           </label>
           <p className="mt-1 text-xs text-slate-500">
-          This is where you give tone and/ or personality for the writer. The how.
+          The how...
           </p>
           <div className="relative mt-3">
             <textarea
@@ -201,6 +235,22 @@ export default function CreatePage() {
               <span className="font-medium tabular-nums">{countdown}</span>s.
             </p>
           </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="fixed inset-0 z-40 overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 bg-slate-900 transform"
+            style={{
+              transitionProperty: "transform, opacity",
+              transitionDuration: "2000ms, 1000ms",
+              transitionTimingFunction:
+                "cubic-bezier(0.22, 1, 0.36, 1), ease-out",
+              transform: swipeStarted ? "translateY(0%)" : "translateY(100%)",
+              opacity: swipeDone ? 0 : 1,
+            }}
+          />
         </div>
       )}
     </FadeIn>

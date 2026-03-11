@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Library, Type } from "lucide-react";
+import { ArrowLeft, Type } from "lucide-react";
 
 export type FontSize = "sm" | "md" | "lg";
 
@@ -35,7 +35,16 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
   }, [open]);
 
   return (
-    <div className="absolute right-0 top-0 flex gap-2">
+    <div className="absolute left-0 top-0 flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 shadow-sm transition-colors duration-200 hover:border-slate-300 hover:bg-white"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="h-4 w-4 text-slate-700" />
+      </button>
+
       <div ref={ref} className="relative">
         <button
           type="button"
@@ -54,7 +63,7 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.96 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full z-50 mt-2 flex flex-col gap-0.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg"
+              className="absolute left-0 top-full z-50 mt-2 flex flex-col gap-0.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg"
             >
               {SIZES.map(({ id, label }) => (
                 <button
@@ -77,15 +86,6 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
           )}
         </AnimatePresence>
       </div>
-
-      <button
-        type="button"
-        onClick={() => setConfirmOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 shadow-sm transition-colors duration-200 hover:border-slate-300 hover:bg-white"
-        aria-label="Go to Library"
-      >
-        <Library className="h-4 w-4 text-slate-700" />
-      </button>
 
       <AnimatePresence>
         {confirmOpen && (
@@ -132,11 +132,11 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
                     type="button"
                     onClick={() => {
                       setConfirmOpen(false);
-                      router.push("/library");
+                      router.back();
                     }}
                     className="flex-1 rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800"
                   >
-                    Confirm
+                    Go back
                   </button>
                 </div>
               </div>

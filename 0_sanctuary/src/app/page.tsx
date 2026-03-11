@@ -1,92 +1,75 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FadeIn } from "./_components/FadeIn";
+import { CurrentActivities } from "./library/CurrentActivities";
+import { createClient } from "@/lib/supabase/server";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: progressRows } = await supabase
+    .from("user_progress")
+    .select("stories_uuid")
+    .eq("user_id", user.id);
+
+  const storyIds = Array.from(
+    new Set((progressRows ?? []).map((p) => p.stories_uuid).filter(Boolean)),
+  ) as string[];
+
+  let wordsRead = 0;
+  let storiesRead = 0;
+
+  if (storyIds.length > 0) {
+    const { data: stories } = await supabase
+      .from("stories")
+      .select("uuid, word_count")
+      .in("uuid", storyIds);
+
+    wordsRead =
+      stories?.reduce(
+        (sum, s) => sum + (typeof s.word_count === "number" ? s.word_count : 0),
+        0,
+      ) ?? 0;
+    storiesRead = stories?.length ?? 0;
+  }
+
   return (
     <FadeIn className="mx-auto w-full max-w-prose">
-      <header className="text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-          Sanctuary
-        </p>
-      </header>
+      <div className="space-y-6 py-8">
+        <h1 className="text-xl font-semibold text-slate-900">Sanctuary</h1>
 
-      <section className="mt-8 space-y-4">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Link
-            href="/create"
-            className="flex h-11 items-center justify-center rounded-full border border-slate-900/80 bg-slate-900 text-sm font-medium text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800"
-          >
-            Write article
-          </Link>
-          <Link
-            href="/library"
-            className="flex h-11 items-center justify-center rounded-full border border-slate-900/80 bg-slate-900 text-sm font-medium text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800"
-          >
-            Library
-          </Link>
-        </div>
+        <CurrentActivities />
 
-        <form className="flex items-center gap-2">
-          <input
-            type="text"
-            maxLength={50}
-            placeholder="Add vocab…"
-            className="flex-1 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
-          />
-          <button
-            type="submit"
-            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800"
-          >
-            Submit
-          </button>
-        </form>
-      </section>
-
-      <section className="mt-10 rounded-3xl border border-slate-200 bg-white/80 p-6">
-        <h2 className="font-serif text-xl font-semibold tracking-tight text-slate-900">
-          This month
-        </h2>
-
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-[#FDFCFB]">
-          <div className="grid grid-cols-5 border-b border-slate-100 bg-slate-50/60 px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-            <span>Month</span>
-            <span className="text-center">01</span>
-            <span className="text-center">02</span>
-            <span className="text-center">03</span>
-            <span className="text-center">04</span>
-          </div>
-          <div className="grid grid-cols-5 px-4 py-3 text-sm text-slate-700">
-            <span className="font-medium">Stories read</span>
-            <span className="text-center">80</span>
-            <span className="text-center">65</span>
-            <span className="text-center">101</span>
-            <span className="text-center">32</span>
-          </div>
-        </div>
-
-        <dl className="mt-6 grid gap-4 text-sm text-slate-600 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-              Total words read
-            </dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-900">
-              42,380
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-              Saved vocab count
-            </dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-900">186</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-              Average translations
-            </dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-900">2.4</dd>
-          </div>
-        </dl>
-      </section>
+        <section className="rounded-3xl border border-slate-200 bg-white/80 p-6">
+          <h2 className="text-sm font-medium uppercase tracking-[0.16em] text-slate-500">
+            Stats
+          </h2>
+          <dl className="mt-4 grid gap-4 text-sm text-slate-700 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                Words read
+              </dt>
+              <dd className="mt-1 text-lg font-semibold text-slate-900">
+                {wordsRead.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+                Stories read
+              </dt>
+              <dd className="mt-1 text-lg font-semibold text-slate-900">
+                {storiesRead.toLocaleString()}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      </div>
     </FadeIn>
   );
 }

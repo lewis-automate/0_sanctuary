@@ -48,8 +48,7 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
       engagement,
     });
     if (result.ok) {
-      router.push("/library");
-      router.refresh();
+      router.push("/reader/done");
     } else {
       setSaving(false);
       setSaveError(result.error ?? "Failed to save progress");

@@ -10,7 +10,7 @@ export default function PasswordPage() {
           href="/settings"
           className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 hover:text-slate-700"
         >
-          ← Settings
+          ← Back to Settings
         </Link>
         <h1 className="mt-4 font-serif text-2xl font-semibold tracking-tight text-slate-900">
           Update password

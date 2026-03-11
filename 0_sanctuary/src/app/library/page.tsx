@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { FadeIn } from "../_components/FadeIn";
-import { CurrentActivities } from "./CurrentActivities";
 import { LibraryList } from "./LibraryList";
 import type { LibraryItem } from "../_data/library";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +10,11 @@ export default async function LibraryPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  console.log("[LibraryPage] Auth user:", {
+    id: user.id,
+    email: user.email,
+  });
 
   const { data: storiesRows } = await supabase
     .from("stories")
@@ -24,14 +28,21 @@ export default async function LibraryPage() {
     .eq("user_id", user.id)
     .order("reading_date", { ascending: false });
 
+  console.log("[LibraryPage] Stories:", storiesRows);
+  console.log("[LibraryPage] Raw progressRows:", progressRows);
+
   // Latest progress per story (first row per story due to order)
   const latestByStory = new Map<string, { reading_date: string; fun_grade: number | null }>();
+  const readCounts = new Map<string, number>();
   for (const p of progressRows ?? []) {
     if (p.stories_uuid && !latestByStory.has(p.stories_uuid)) {
       latestByStory.set(p.stories_uuid, {
         reading_date: p.reading_date,
         fun_grade: p.fun_grade ?? null,
       });
+    }
+    if (p.stories_uuid) {
+      readCounts.set(p.stories_uuid, (readCounts.get(p.stories_uuid) ?? 0) + 1);
     }
   }
 
@@ -45,6 +56,7 @@ export default async function LibraryPage() {
       creation_date: s.creation_date ?? "",
       reading_date: progress?.reading_date ?? null,
       fun_grade: progress?.fun_grade ?? null,
+      read_count: readCounts.get(s.uuid) ?? 0,
     };
   });
 
@@ -55,7 +67,6 @@ export default async function LibraryPage() {
           Library
         </p>
       </header>
-      <CurrentActivities />
       <LibraryList items={items} />
     </FadeIn>
   );
