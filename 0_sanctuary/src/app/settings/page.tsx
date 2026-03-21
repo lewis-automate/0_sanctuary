@@ -1,8 +1,12 @@
+import { randomUUID } from "crypto";
 import Link from "next/link";
 import { FadeIn } from "../_components/FadeIn";
 import { LogoutButton } from "../_components/LogoutButton";
+import type { UserSettingsProfile } from "./actions";
 import { UserSettingsClient } from "./UserSettingsClient";
 import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   searchParams?: Promise<{ message?: string }> | { message?: string };
@@ -21,67 +25,133 @@ function coerceVocabChunkingToBoolean(
   return false;
 }
 
+function coerceLastStoriesFilter(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(99, Math.trunc(n)));
+}
+
+function coerceWordTarget(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.trunc(n);
+}
+
+function mapRowToUserProfile(
+  row: Record<string, unknown>,
+  source: "user_settings" | "users",
+): UserSettingsProfile {
+  const username =
+    source === "users"
+      ? String(row.name ?? row.username ?? "")
+      : String(row.username ?? row.name ?? "");
+
+  const levelRaw =
+    (typeof row.reading_level_desc === "string"
+      ? row.reading_level_desc
+      : null) ??
+    (typeof row.difficulty === "string" ? row.difficulty : null);
+  const difficulty =
+    typeof levelRaw === "string" && levelRaw.trim() !== ""
+      ? levelRaw.trim()
+      : null;
+
+  return {
+    username,
+    target_language: String(row.target_language ?? ""),
+    native_language: String(row.native_language ?? ""),
+    difficulty,
+    word_target: coerceWordTarget(row.word_target),
+    last_stories_filter: coerceLastStoriesFilter(
+      row.last_stories_filter ?? row.past,
+    ),
+    preferred_tone: String(row.preferred_tone ?? ""),
+    vocab_chunking: coerceVocabChunkingToBoolean(row.vocab_chunking),
+  };
+}
+
+const EMPTY_PROFILE: UserSettingsProfile = {
+  username: "",
+  target_language: "",
+  native_language: "",
+  difficulty: null,
+  word_target: null,
+  last_stories_filter: null,
+  preferred_tone: "",
+  vocab_chunking: false,
+};
+
 export default async function SettingsPage({ searchParams }: PageProps) {
   const params =
     searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const message = params.message;
+  const clientMountKey = randomUUID();
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const DIFFICULTY_OPTIONS = [
-    "A2",
-    "A2/B1",
-    "B1",
-    "B1/B2",
-    "B2",
-    "B2/C1",
-    "C1",
-  ];
-
-  let settingsRow: Record<string, unknown> | null = null;
+  let initialUser: UserSettingsProfile = EMPTY_PROFILE;
 
   if (user) {
-    const { data, error } = await supabase
+    let userSettingsRow: Record<string, unknown> | null = null;
+
+    const byUserId = await supabase
       .from("user_settings")
-      .select(
-        "username, target_language, native_language, reading_level_desc, word_target, preferred_tone, vocab_chunking",
-      )
-      .eq("id", user.id)
+      .select("*")
+      .eq("user_id", user.id)
       .maybeSingle();
 
-    if (error) {
-      console.error("[Settings] user_settings query error:", error.message);
+    if (byUserId.error) {
+      const msg = byUserId.error.message;
+      const missingUserIdCol =
+        /user_id/i.test(msg) &&
+        (/does not exist/i.test(msg) || /schema cache/i.test(msg));
+      if (!missingUserIdCol) {
+        console.error("[Settings] user_settings (user_id) error:", msg);
+      }
+    } else if (byUserId.data) {
+      userSettingsRow = byUserId.data as Record<string, unknown>;
     }
-    settingsRow = data;
 
-    if (!settingsRow) {
-      const { data: usersRow } = await supabase
-        .from("users")
-        .select(
-          "name, target_language, native_language, reading_level_desc, word_target, preferred_tone, vocab_chunking",
-        )
+    if (!userSettingsRow) {
+      const byId = await supabase
+        .from("user_settings")
+        .select("*")
         .eq("id", user.id)
         .maybeSingle();
 
-      if (usersRow) {
-        const levelDesc = usersRow.reading_level_desc ?? "";
-        const difficulty =
-          typeof levelDesc === "string" &&
-          DIFFICULTY_OPTIONS.includes(levelDesc)
-            ? levelDesc
-            : null;
-        settingsRow = {
-          username: usersRow.name ?? "",
-          target_language: usersRow.target_language ?? "",
-          native_language: usersRow.native_language ?? "",
-          difficulty,
-          word_target: usersRow.word_target ?? null,
-          preferred_tone: usersRow.preferred_tone ?? "",
-          vocab_chunking: usersRow.vocab_chunking,
-        };
+      if (byId.error) {
+        console.error(
+          "[Settings] user_settings (id) error:",
+          byId.error.message,
+        );
+      } else if (byId.data) {
+        userSettingsRow = byId.data as Record<string, unknown>;
+      }
+    }
+
+    if (userSettingsRow) {
+      initialUser = mapRowToUserProfile(userSettingsRow, "user_settings");
+    } else {
+      const usersRes = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (usersRes.error) {
+        console.error("[Settings] users query error:", usersRes.error.message);
+      }
+
+      if (usersRes.data) {
+        initialUser = mapRowToUserProfile(
+          usersRes.data as Record<string, unknown>,
+          "users",
+        );
       }
     }
   }
@@ -98,21 +168,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     }
     topicRows = res.data;
   }
-
-  const difficultyFromRow =
-    (settingsRow?.reading_level_desc as string) ??
-    (settingsRow?.difficulty as string) ??
-    null;
-
-  const initialUser = {
-    username: (settingsRow?.username as string) ?? "",
-    target_language: (settingsRow?.target_language as string) ?? "",
-    native_language: (settingsRow?.native_language as string) ?? "",
-    difficulty: difficultyFromRow,
-    word_target: (settingsRow?.word_target as number | null) ?? null,
-    preferred_tone: (settingsRow?.preferred_tone as string) ?? "",
-    vocab_chunking: coerceVocabChunkingToBoolean(settingsRow?.vocab_chunking),
-  };
 
   const initialTopics =
     topicRows?.map((t) => ({
@@ -153,6 +208,7 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       </div>
 
       <UserSettingsClient
+        key={user ? `${user.id}-${clientMountKey}` : "guest"}
         initialUser={initialUser}
         initialTopics={initialTopics}
       />

@@ -74,35 +74,56 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
   }, [tooltip]);
 
   const showTooltipFromSelection = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection) return;
-    const text = selection.toString().trim();
+    // Read after layout so getBoundingClientRect matches the committed selection
+    // (especially important on mobile after drag-to-select).
+    requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (!selection) return;
+      const text = selection.toString().trim();
 
-    const anchor = selection.anchorNode;
-    if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
-      setTooltip(null);
-      return;
-    }
+      const anchor = selection.anchorNode;
+      if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
+        setTooltip(null);
+        return;
+      }
 
-    const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    const rect = range?.getBoundingClientRect();
-    if (!rect) return;
+      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const rect = range?.getBoundingClientRect();
+      if (!rect) return;
 
-    setTooltip({
-      x: rect.left + rect.width / 2,
-      y: rect.top,
-      text,
+      setTooltip({
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+        text,
+      });
     });
   }, []);
 
-  // Desktop: selection is available on mouseup. Mobile: selection is often
-  // committed only after touchend, so we read it after a short delay.
+  // Touches that end on selection handles (common on Android) do not bubble
+  // touchend to the article, but selectionchange still fires when the range updates.
+  useEffect(() => {
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+    const onSelectionChange = () => {
+      if (debounceId !== undefined) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        debounceId = undefined;
+        showTooltipFromSelection();
+      }, 100);
+    };
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", onSelectionChange);
+      if (debounceId !== undefined) clearTimeout(debounceId);
+    };
+  }, [showTooltipFromSelection]);
+
+  // Desktop: selection is available on mouseup. Mobile: backup when touchend
+  // reaches the article (tap-to-select); drag handles rely on selectionchange.
   const handleMouseUp = useCallback(() => {
     showTooltipFromSelection();
   }, [showTooltipFromSelection]);
 
   const handleTouchEnd = useCallback(() => {
-    // Let the browser commit the selection before we read it (iOS/Android).
     setTimeout(showTooltipFromSelection, 150);
   }, [showTooltipFromSelection]);
 
@@ -179,7 +200,7 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
           <div className="mt-2 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white/60 p-4">
             {savedVocab.length === 0 ? (
               <span className="text-sm text-slate-400">
-                Saved words will appear here
+                Select words to save them here.
               </span>
             ) : (
               savedVocab.map((word) => (
@@ -216,7 +237,7 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
               maxLength={500}
               value={thoughts}
               onChange={(e) => setThoughts(e.target.value)}
-              placeholder="Share anything that comes to mind"
+              placeholder="Share anything that comes to mind or summarize the story in a few sentences."
               className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 px-3 py-3 pb-8 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
             />
             <span className="absolute bottom-3 right-3 text-xs text-slate-400">

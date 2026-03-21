@@ -7,6 +7,8 @@ export type StoryGenPayload = {
   tone?: string;
   difficulty?: string;
   word_count?: string;
+  /** Override profile default; omit to use settings `last_stories_filter`. */
+  last_stories_filter?: number;
 };
 
 export async function queueStoryGeneration(payload: StoryGenPayload): Promise<

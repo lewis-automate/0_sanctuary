@@ -19,6 +19,7 @@ export function LogoutButton() {
     <>
       <button
         type="button"
+        data-settings-logout
         onClick={() => setShowConfirm(true)}
         className="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 text-left transition-colors hover:bg-white"
       >

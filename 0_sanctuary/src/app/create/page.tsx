@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FadeIn } from "../_components/FadeIn";
 import { useEffect, useState } from "react";
 import { queueStoryGeneration } from "./actions";
@@ -13,6 +14,7 @@ export default function CreatePage() {
   const [tone, setTone] = useState("");
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState("");
+  const [topicMemory, setTopicMemory] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -31,6 +33,7 @@ export default function CreatePage() {
           setTone("");
           setDifficulty(null);
           setWordCount("");
+          setTopicMemory("");
           return 0;
         }
         return c - 1;
@@ -77,6 +80,16 @@ export default function CreatePage() {
     setWordCount(n > 2500 ? "2500" : digits);
   };
 
+  const handleTopicMemoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
+    if (digits === "") {
+      setTopicMemory("");
+      return;
+    }
+    const n = parseInt(digits, 10);
+    setTopicMemory(n > 99 ? "99" : digits);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -86,6 +99,13 @@ export default function CreatePage() {
       tone: tone || undefined,
       difficulty: difficulty || undefined,
       word_count: wordCount || undefined,
+      last_stories_filter: (() => {
+        const t = topicMemory.trim();
+        if (t === "") return undefined;
+        const n = parseInt(t, 10);
+        if (!Number.isFinite(n)) return undefined;
+        return Math.min(99, Math.max(0, n));
+      })(),
     });
     setSubmitting(false);
     if (result.ok) {
@@ -104,6 +124,10 @@ export default function CreatePage() {
           Create Reading Material
         </p>
       </header>
+
+      <p className="mb-6 text-center text-sm leading-relaxed text-slate-600 sm:text-left">
+        Leave the fields empty to use your profile&apos;s default settings.<br /> Or create one-off reading material with unique settings.
+      </p>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
         <section>
@@ -155,7 +179,7 @@ export default function CreatePage() {
             Difficulty
           </label>
           <p className="mt-1 text-xs text-slate-500">
-            Start slightly below your current level.
+            Recommended: Start slightly below your current level.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
             {DIFFICULTY_OPTIONS.map((label) => {
@@ -198,6 +222,25 @@ export default function CreatePage() {
             onChange={handleWordCountChange}
             className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
             placeholder="e.g. 400 (max 2500)"
+          />
+        </section>
+
+        <section>
+          <label className="block text-sm font-medium text-slate-1000">
+            Topic memory
+          </label>
+          <p className="mt-1 text-xs text-slate-500">
+            This works only if topic already exists.
+          </p>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            value={topicMemory}
+            onChange={handleTopicMemoryChange}
+            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+            placeholder="0–99 (optional)"
           />
         </section>
 

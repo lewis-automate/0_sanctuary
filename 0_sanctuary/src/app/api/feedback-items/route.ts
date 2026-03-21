@@ -16,7 +16,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("feedback")
     .select(
-      "id, raw_input, alternate_version, feedback, focus_point, date_added",
+      "id, raw_input, alternate_version, feedback, focus_point, date_added, reviewed",
     )
     .eq("user_id", user.id)
     .order("date_added", { ascending: false });

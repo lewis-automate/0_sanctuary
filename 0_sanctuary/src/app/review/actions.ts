@@ -2,38 +2,19 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export type UserSettingsProfile = {
-  username: string;
-  target_language: string;
-  native_language: string;
-  difficulty: string | null;
-  word_target: number | null;
-  last_stories_filter: number | null;
-  preferred_tone: string;
-  vocab_chunking: boolean;
+export type FeedbackReviewedPayload = {
+  feedback_id: string;
+  reviewed: boolean;
+  focus_point: string | null;
 };
 
-/** Every item has the same keys; new topics use id: null */
-export type UpsertTopic = {
-  id: number | string | null;
-  topic_name: string;
-  active: boolean;
-};
-
-export type UserSettingsSavePayload = {
-  user_settings: UserSettingsProfile;
-  upsert_topics: UpsertTopic[];
-  deleted_ids: (number | string)[];
-};
-
-export async function queueUserSettings(
-  payload: UserSettingsSavePayload,
+export async function queueFeedbackReviewed(
+  payload: FeedbackReviewedPayload,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) {
     return { ok: false, error: "Not authenticated" };
   }
@@ -42,7 +23,7 @@ export async function queueUserSettings(
     .from("activity_queue")
     .insert({
       user_id: user.id,
-      event_type: "user_settings",
+      event_type: "feedback_reviewed",
       status: "pending",
       payload,
     })
@@ -61,6 +42,9 @@ export async function queueUserSettings(
     return { ok: true };
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const res = await fetch(n8nUrl, {
       method: "POST",
@@ -68,18 +52,20 @@ export async function queueUserSettings(
       body: JSON.stringify({
         job_id: row.id,
         user_id: user.id,
-        event_type: "user_settings",
+        event_type: "feedback_reviewed",
         ...payload,
       }),
+      signal: controller.signal,
     });
-    if (!res.ok) {
-      return { ok: false, error: `Webhook returned ${res.status}` };
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      return { ok: true };
     }
+    console.error("[queueFeedbackReviewed] n8n webhook non-2xx:", res.status);
+    return { ok: false, error: `Webhook returned ${res.status}` };
   } catch (err) {
-    console.error("[queueUserSettings] n8n webhook error:", err);
-    // Settings are already queued, treat as success
+    clearTimeout(timeoutId);
+    console.error("[queueFeedbackReviewed] n8n webhook error:", err);
+    return { ok: true };
   }
-
-  return { ok: true };
 }
-
