@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleHelp, Languages } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleHelp, Languages } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -13,6 +13,10 @@ import {
 import { createPortal } from "react-dom";
 import type { Story } from "../_data/stories";
 import { queueProgressUpdate } from "../reader/actions";
+import {
+  nudgeSelectionExpandRight,
+  nudgeSelectionShrinkFromRight,
+} from "@/lib/nudge-text-selection";
 
 type FontSize = "sm" | "md" | "lg";
 
@@ -68,8 +72,8 @@ type TranslateAnchor = {
 };
 
 const TEXT_MARGIN_PX = 8;
-/** ~translate + Save + help; used to clamp toolbar before measure */
-const TOOLBAR_ESTIMATE_PX = 300;
+/** ~nudge + translate + Save + help + nudge; used to clamp toolbar before measure */
+const TOOLBAR_ESTIMATE_PX = 380;
 
 function clampCenterXInBounds(
   centerX: number,
@@ -251,6 +255,18 @@ export function InteractiveStory({
 
   const handleTouchEnd = useCallback(() => {
     setTimeout(showTooltipFromSelection, 150);
+  }, [showTooltipFromSelection]);
+
+  const handleNudgeSelectionLeft = useCallback(() => {
+    if (!containerRef.current) return;
+    nudgeSelectionShrinkFromRight(containerRef.current);
+    requestAnimationFrame(() => showTooltipFromSelection());
+  }, [showTooltipFromSelection]);
+
+  const handleNudgeSelectionRight = useCallback(() => {
+    if (!containerRef.current) return;
+    if (!nudgeSelectionExpandRight(containerRef.current)) return;
+    requestAnimationFrame(() => showTooltipFromSelection());
   }, [showTooltipFromSelection]);
 
   const handleSaveVocab = useCallback(() => {
@@ -577,6 +593,19 @@ export function InteractiveStory({
                   >
                     <button
                       type="button"
+                      title="Remove one character from the right"
+                      aria-label="Remove one character from the right side of the selection"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNudgeSelectionLeft();
+                      }}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                    >
+                      <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
                       disabled={!canUseReaderAi}
                       title={
                         !targetLanguage.trim() || !nativeLanguage.trim()
@@ -616,6 +645,19 @@ export function InteractiveStory({
                       aria-label="Grammar help"
                     >
                       <CircleHelp className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      title="Add one character on the right"
+                      aria-label="Add one character to the right side of the selection"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNudgeSelectionRight();
+                      }}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                    >
+                      <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
                     </button>
                   </motion.div>
                 </div>
