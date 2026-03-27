@@ -1,8 +1,16 @@
 "use client";
 
+import { CircleHelp, Languages } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import type { Story } from "../_data/stories";
 import { queueProgressUpdate } from "../reader/actions";
 
@@ -17,17 +25,104 @@ const FONT_CLASSES: Record<FontSize, string> = {
 type Props = {
   story: Story;
   fontSize?: FontSize;
+  /** From profile; both required for translate */
+  targetLanguage?: string;
+  nativeLanguage?: string;
 };
 
+function buildSelectionContext(storyBody: string, highlighted: string): string {
+  const trimmed = highlighted.trim();
+  if (!trimmed) return "";
+  const paragraphs = storyBody.split(/\n\n/);
+  const collapsedHighlight = trimmed.replace(/\s+/g, " ");
+  for (const p of paragraphs) {
+    const collapsedP = p.replace(/\s+/g, " ");
+    if (p.includes(trimmed) || collapsedP.includes(collapsedHighlight)) {
+      return p.trim();
+    }
+  }
+  const idx = storyBody.indexOf(trimmed);
+  if (idx === -1) {
+    return storyBody.slice(0, Math.min(500, storyBody.length)).trim();
+  }
+  const pad = 100;
+  const start = Math.max(0, idx - pad);
+  const end = Math.min(storyBody.length, idx + trimmed.length + pad);
+  return storyBody.slice(start, end).trim();
+}
+
 type TooltipState = {
-  x: number;
-  y: number;
+  /** Horizontal center of the selection (viewport px) */
+  centerX: number;
+  top: number;
+  bottom: number;
+  width: number;
   text: string;
 } | null;
 
-export function InteractiveStory({ story, fontSize = "md" }: Props) {
+type TranslateAnchor = {
+  centerX: number;
+  top: number;
+  bottom: number;
+  width: number;
+};
+
+const TEXT_MARGIN_PX = 8;
+/** ~translate + Save + help; used to clamp toolbar before measure */
+const TOOLBAR_ESTIMATE_PX = 300;
+
+function clampCenterXInBounds(
+  centerX: number,
+  elementWidth: number,
+  bounds: DOMRect,
+  margin: number,
+): number {
+  const half = elementWidth / 2;
+  const minC = bounds.left + margin + half;
+  const maxC = bounds.right - margin - half;
+  if (minC > maxC) {
+    return (bounds.left + bounds.right) / 2;
+  }
+  return Math.min(Math.max(centerX, minC), maxC);
+}
+
+function clampLeftForCenteredWidth(
+  centerX: number,
+  width: number,
+  bounds: DOMRect,
+  margin: number,
+): number {
+  const half = width / 2;
+  const idealLeft = centerX - half;
+  const minL = bounds.left + margin;
+  const maxL = bounds.right - margin - width;
+  if (maxL < minL) return minL;
+  return Math.min(Math.max(idealLeft, minL), maxL);
+}
+
+export function InteractiveStory({
+  story,
+  fontSize = "md",
+  targetLanguage = "",
+  nativeLanguage = "",
+}: Props) {
   const router = useRouter();
   const [tooltip, setTooltip] = useState<TooltipState>(null);
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateLoading, setTranslateLoading] = useState(false);
+  const [translateText, setTranslateText] = useState("");
+  const [translateSynonym, setTranslateSynonym] = useState("");
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  const [grammarOpen, setGrammarOpen] = useState(false);
+  const [grammarLoading, setGrammarLoading] = useState(false);
+  const [grammarText, setGrammarText] = useState("");
+  const [grammarError, setGrammarError] = useState<string | null>(null);
+  const [translateAnchor, setTranslateAnchor] = useState<TranslateAnchor | null>(
+    null,
+  );
+  const [translatePlacement, setTranslatePlacement] = useState<"below" | "above">(
+    "below",
+  );
   const [savedVocab, setSavedVocab] = useState<string[]>([]);
   const [thoughts, setThoughts] = useState("");
   const [difficulty, setDifficulty] = useState<number | null>(null);
@@ -36,6 +131,34 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const translatePopupRef = useRef<HTMLDivElement>(null);
+  const [portalReady, setPortalReady] = useState(false);
+  /** Re-read text-area bounds on scroll/resize while overlays are open */
+  const [layoutTick, setLayoutTick] = useState(0);
+  const [toolbarWidth, setToolbarWidth] = useState(0);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!tooltip && !translateOpen && !grammarOpen) return;
+    const bump = () => setLayoutTick((n) => n + 1);
+    window.addEventListener("scroll", bump, true);
+    window.addEventListener("resize", bump);
+    return () => {
+      window.removeEventListener("scroll", bump, true);
+      window.removeEventListener("resize", bump);
+    };
+  }, [tooltip, translateOpen, grammarOpen]);
+
+  useLayoutEffect(() => {
+    if (!tooltip || !tooltipRef.current) {
+      setToolbarWidth(0);
+      return;
+    }
+    setToolbarWidth(tooltipRef.current.getBoundingClientRect().width);
+  }, [tooltip, layoutTick]);
 
   const handleFinishedReading = useCallback(async () => {
     setSaveError(null);
@@ -60,6 +183,7 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
     const dismiss = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
       if (target && tooltipRef.current?.contains(target)) return;
+      if (target && translatePopupRef.current?.contains(target)) return;
       setTooltip(null);
       window.getSelection()?.removeAllRanges();
     };
@@ -92,8 +216,10 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
       if (!rect) return;
 
       setTooltip({
-        x: rect.left + rect.width / 2,
-        y: rect.top,
+        centerX: rect.left + rect.width / 2,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
         text,
       });
     });
@@ -142,6 +268,146 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
     setSavedVocab((prev) => prev.filter((w) => w !== word));
   }, []);
 
+  const canUseReaderAi =
+    Boolean(targetLanguage.trim() && nativeLanguage.trim()) && Boolean(tooltip?.text);
+
+  const handleTranslate = useCallback(async () => {
+    if (!tooltip?.text.trim()) return;
+    setTranslateAnchor({
+      centerX: tooltip.centerX,
+      top: tooltip.top,
+      bottom: tooltip.bottom,
+      width: tooltip.width,
+    });
+    setGrammarOpen(false);
+    setGrammarError(null);
+    setTranslateOpen(true);
+    setTranslateLoading(true);
+    setTranslateError(null);
+    setTranslateText("");
+    setTranslateSynonym("");
+    const context = buildSelectionContext(story.body, tooltip.text);
+    try {
+      const res = await fetch("/api/translate-selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: tooltip.text,
+          context,
+        }),
+      });
+      const data = (await res.json()) as {
+        translation?: unknown;
+        synonym?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        setTranslateError(data.error ?? "Translation failed");
+        return;
+      }
+      const raw =
+        typeof data.translation === "string" ? data.translation.trim() : "";
+      const syn =
+        typeof data.synonym === "string" ? data.synonym.trim() : "";
+      if (raw) {
+        setTranslateText(raw);
+        setTranslateSynonym(syn);
+      } else {
+        setTranslateError("No translation returned");
+      }
+    } catch {
+      setTranslateError("Could not reach translator");
+    } finally {
+      setTranslateLoading(false);
+    }
+  }, [story.body, tooltip]);
+
+  const handleGrammar = useCallback(async () => {
+    if (!tooltip?.text.trim()) return;
+    setTranslateAnchor({
+      centerX: tooltip.centerX,
+      top: tooltip.top,
+      bottom: tooltip.bottom,
+      width: tooltip.width,
+    });
+    setTranslateOpen(false);
+    setTranslateError(null);
+    setGrammarOpen(true);
+    setGrammarLoading(true);
+    setGrammarError(null);
+    setGrammarText("");
+    const context = buildSelectionContext(story.body, tooltip.text);
+    try {
+      const res = await fetch("/api/grammar-selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: tooltip.text,
+          context,
+        }),
+      });
+      const data = (await res.json()) as {
+        explanation?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        setGrammarError(data.error ?? "Grammar help failed");
+        return;
+      }
+      const raw =
+        typeof data.explanation === "string" ? data.explanation.trim() : "";
+      if (raw) {
+        setGrammarText(raw);
+      } else {
+        setGrammarError("No explanation returned");
+      }
+    } catch {
+      setGrammarError("Could not reach grammar helper");
+    } finally {
+      setGrammarLoading(false);
+    }
+  }, [story.body, tooltip]);
+
+  useLayoutEffect(() => {
+    if ((!translateOpen && !grammarOpen) || !translateAnchor) return;
+    const el = translatePopupRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const h = el.getBoundingClientRect().height;
+      const gap = 8;
+      const spaceBelow = window.innerHeight - translateAnchor.bottom - gap;
+      const spaceAbove = translateAnchor.top - gap;
+      if (spaceBelow >= h) {
+        setTranslatePlacement("below");
+      } else if (spaceAbove >= h) {
+        setTranslatePlacement("above");
+      } else {
+        setTranslatePlacement(spaceAbove > spaceBelow ? "above" : "below");
+      }
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [
+    translateOpen,
+    grammarOpen,
+    translateAnchor,
+    translateLoading,
+    grammarLoading,
+    translateText,
+    translateSynonym,
+    translateError,
+    grammarText,
+    grammarError,
+  ]);
+
   return (
     <>
       <div
@@ -155,42 +421,6 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
           <p key={i}>{paragraph}</p>
         ))}
       </div>
-
-      <AnimatePresence>
-        {tooltip && (
-          <motion.div
-            ref={tooltipRef}
-            className="fixed z-50 flex -translate-x-1/2 -translate-y-full gap-2 rounded-full bg-slate-900 px-2 py-1.5 shadow-lg"
-            style={{
-              left: tooltip.x,
-              top: tooltip.y - 8,
-            }}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{
-              opacity: 0,
-              scale: 1.15,
-              transition: { duration: 0.2, ease: "easeOut" },
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleSaveVocab}
-              disabled={savedVocab.length >= 15}
-              className="rounded-full px-3 py-1 text-xs font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Save vocab
-            </button>
-            <button
-              type="button"
-              disabled
-              className="cursor-not-allowed rounded-full px-3 py-1 text-xs font-medium text-slate-500"
-            >
-              Translate
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <section className="mt-10 space-y-4 border-t border-slate-200 pt-6">
         <div>
@@ -304,6 +534,236 @@ export function InteractiveStory({ story, fontSize = "md" }: Props) {
           {saving ? "Saving progress…" : "I have finished reading"}
         </button>
       </section>
+
+      {portalReady &&
+        createPortal(
+          <>
+            <AnimatePresence>
+              {tooltip && (
+                <div
+                  className="fixed z-50"
+                  style={{
+                    left: (() => {
+                      void layoutTick;
+                      const bounds = containerRef.current?.getBoundingClientRect();
+                      const barW = Math.max(
+                        toolbarWidth || TOOLBAR_ESTIMATE_PX,
+                        200,
+                      );
+                      if (!bounds) {
+                        return tooltip.centerX;
+                      }
+                      return clampCenterXInBounds(
+                        tooltip.centerX,
+                        barW,
+                        bounds,
+                        TEXT_MARGIN_PX,
+                      );
+                    })(),
+                    top: tooltip.top - 8,
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
+                  <motion.div
+                    ref={tooltipRef}
+                    className="flex items-center gap-1 rounded-full bg-slate-900 px-1.5 py-1.5 shadow-lg"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{
+                      opacity: 0,
+                      scale: 1.15,
+                      transition: { duration: 0.2, ease: "easeOut" },
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={!canUseReaderAi}
+                      title={
+                        !targetLanguage.trim() || !nativeLanguage.trim()
+                          ? "Add target and native language in Settings"
+                          : "Translate"
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleTranslate();
+                      }}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-60"
+                      aria-label="Translate"
+                    >
+                      <Languages className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveVocab}
+                      disabled={savedVocab.length >= 15}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canUseReaderAi}
+                      title={
+                        !targetLanguage.trim() || !nativeLanguage.trim()
+                          ? "Add target and native language in Settings"
+                          : "Grammar help"
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleGrammar();
+                      }}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-60"
+                      aria-label="Grammar help"
+                    >
+                      <CircleHelp className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </button>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {(translateOpen || grammarOpen) && translateAnchor && (
+                <motion.div
+                  key="reader-ai-popover"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[54]"
+                  aria-hidden={!(translateOpen || grammarOpen)}
+                >
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-slate-900/20"
+                    aria-label="Close panel"
+                    onClick={() => {
+                      setTranslateOpen(false);
+                      setTranslateError(null);
+                      setGrammarOpen(false);
+                      setGrammarError(null);
+                      setTranslateAnchor(null);
+                    }}
+                  />
+                  {/* Horizontally clamped to the story text column (not full viewport). */}
+                  <div
+                    ref={translatePopupRef}
+                    style={(() => {
+                      void layoutTick;
+                      const vw =
+                        typeof window !== "undefined" ? window.innerWidth : 400;
+                      const bounds = containerRef.current?.getBoundingClientRect();
+                      let panelWidth = Math.min(
+                        Math.max(translateAnchor.width + 48, 200),
+                        Math.min(vw * 0.92, 640),
+                      );
+                      let left: number;
+                      if (bounds) {
+                        const innerMax = bounds.width - 2 * TEXT_MARGIN_PX;
+                        if (innerMax > 0) {
+                          panelWidth = Math.min(panelWidth, innerMax);
+                        }
+                        left = clampLeftForCenteredWidth(
+                          translateAnchor.centerX,
+                          panelWidth,
+                          bounds,
+                          TEXT_MARGIN_PX,
+                        );
+                      } else {
+                        left = Math.min(
+                          Math.max(translateAnchor.centerX - panelWidth / 2, 8),
+                          Math.max(8, vw - panelWidth - 8),
+                        );
+                      }
+                      return {
+                        position: "fixed" as const,
+                        left,
+                        width: panelWidth,
+                        zIndex: 55,
+                        ...(translatePlacement === "below"
+                          ? { top: translateAnchor.bottom + 8 }
+                          : {
+                              bottom:
+                                typeof window !== "undefined"
+                                  ? window.innerHeight - translateAnchor.top + 8
+                                  : undefined,
+                            }),
+                      };
+                    })()}
+                    className="flex max-h-[min(50vh,28rem)] flex-col overflow-hidden"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.96 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 520, damping: 32 }}
+                      style={{ transformOrigin: "top center" }}
+                      className="flex max-h-[min(50vh,28rem)] min-h-0 flex-col overflow-hidden rounded-2xl border border-white/40 bg-[#FDFCFB]/92 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-[#FDFCFB]/88"
+                    >
+                      <div className="flex shrink-0 items-center justify-between border-b border-slate-200/60 px-4 py-3">
+                        <span className="text-sm font-semibold text-slate-900">
+                          {translateOpen ? "Translation" : "Grammar"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTranslateOpen(false);
+                            setTranslateError(null);
+                            setGrammarOpen(false);
+                            setGrammarError(null);
+                            setTranslateAnchor(null);
+                          }}
+                          className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-900/5"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2">
+                        {translateOpen && translateLoading && (
+                          <p className="text-sm text-slate-500">Translating…</p>
+                        )}
+                        {grammarOpen && grammarLoading && (
+                          <p className="text-sm text-slate-500">
+                            Getting a grammar note…
+                          </p>
+                        )}
+                        {translateOpen && !translateLoading && translateError && (
+                          <p className="text-sm text-red-600">{translateError}</p>
+                        )}
+                        {grammarOpen && !grammarLoading && grammarError && (
+                          <p className="text-sm text-red-600">{grammarError}</p>
+                        )}
+                        {translateOpen &&
+                          !translateLoading &&
+                          !translateError &&
+                          translateText && (
+                            <div className="space-y-2">
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                                {translateText}
+                              </p>
+                              {translateSynonym ? (
+                                <p className="text-sm leading-relaxed text-slate-600">
+                                  {translateSynonym}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
+                        {grammarOpen &&
+                          !grammarLoading &&
+                          !grammarError &&
+                          grammarText && (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                              {grammarText}
+                            </p>
+                          )}
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>,
+          document.body,
+        )}
     </>
   );
 }

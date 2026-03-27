@@ -10,9 +10,16 @@ import type { Story } from "../_data/stories";
 type Props = {
   story: Story | null;
   message?: string;
+  targetLanguage?: string;
+  nativeLanguage?: string;
 };
 
-export function ReaderContent({ story, message }: Props) {
+export function ReaderContent({
+  story,
+  message,
+  targetLanguage = "",
+  nativeLanguage = "",
+}: Props) {
   const [fontSize, setFontSize] = useState<FontSize>("md");
 
   if (!story) {
@@ -46,7 +53,12 @@ export function ReaderContent({ story, message }: Props) {
           </p>
         </header>
 
-        <InteractiveStory story={story} fontSize={fontSize} />
+        <InteractiveStory
+          story={story}
+          fontSize={fontSize}
+          targetLanguage={targetLanguage}
+          nativeLanguage={nativeLanguage}
+        />
       </FadeIn>
     </div>
   );

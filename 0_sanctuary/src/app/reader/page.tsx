@@ -1,5 +1,6 @@
 import { ReaderContent } from "../_components/ReaderContent";
 import type { Story } from "../_data/stories";
+import { getUserLanguagePair } from "@/lib/user-languages";
 import { createClient } from "@/lib/supabase/server";
 
 type PageProps = {
@@ -10,22 +11,40 @@ export default async function ReaderPage({ searchParams }: PageProps) {
   const params = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const storyId = params.story;
 
-  if (!storyId) {
-    return (
-      <ReaderContent
-        story={null}
-        message="Pick a story from the library to read."
-      />
-    );
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    return <ReaderContent story={null} message="Please sign in." />;
+
+  if (!storyId) {
+    const langs = user
+      ? await getUserLanguagePair(supabase, user.id)
+      : { targetLanguage: "", nativeLanguage: "" };
+    return (
+      <ReaderContent
+        story={null}
+        message="Pick a story from the library to read."
+        targetLanguage={langs.targetLanguage}
+        nativeLanguage={langs.nativeLanguage}
+      />
+    );
   }
+
+  if (!user) {
+    return (
+      <ReaderContent
+        story={null}
+        message="Please sign in."
+        targetLanguage=""
+        nativeLanguage=""
+      />
+    );
+  }
+
+  const { targetLanguage, nativeLanguage } = await getUserLanguagePair(
+    supabase,
+    user.id,
+  );
 
   const { data: row } = await supabase
     .from("stories")
@@ -49,6 +68,8 @@ export default async function ReaderPage({ searchParams }: PageProps) {
     <ReaderContent
       story={story}
       message={story ? undefined : "Story not found."}
+      targetLanguage={targetLanguage}
+      nativeLanguage={nativeLanguage}
     />
   );
 }
