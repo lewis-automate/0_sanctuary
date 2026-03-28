@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { FadeIn } from "../_components/FadeIn";
 import { LogoutButton } from "../_components/LogoutButton";
@@ -178,6 +179,14 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   return (
     <FadeIn className="mx-auto w-full max-w-prose">
+      <Link
+        href="/"
+        className="fixed left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-[60] rounded-full border border-slate-200 bg-[#fbf5ef]/90 p-2.5 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20"
+        aria-label="Back to home"
+      >
+        <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
+      </Link>
+
       <header className="mb-4 text-center sm:text-left">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
           Settings
@@ -198,12 +207,6 @@ export default async function SettingsPage({ searchParams }: PageProps) {
           className="rounded-full bg-transparent px-3 py-1 text-xs text-slate-600 hover:bg-slate-900/5 hover:text-slate-900"
         >
           Password
-        </Link>
-        <Link
-          href="/settings/updates"
-          className="rounded-full bg-transparent px-3 py-1 text-xs text-slate-600 hover:bg-slate-900/5 hover:text-slate-900"
-        >
-          Updates
         </Link>
       </div>
 

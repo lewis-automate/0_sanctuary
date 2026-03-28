@@ -11,25 +11,18 @@ export default async function LibraryPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  console.log("[LibraryPage] Auth user:", {
-    id: user.id,
-    email: user.email,
-  });
-
-  const { data: storiesRows } = await supabase
-    .from("stories")
-    .select("uuid, story_title, word_count, reading_level, creation_date")
-    .eq("original_author_id", user.id)
-    .order("creation_date", { ascending: false });
-
-  const { data: progressRows } = await supabase
-    .from("user_progress")
-    .select("stories_uuid, reading_date, fun_grade")
-    .eq("user_id", user.id)
-    .order("reading_date", { ascending: false });
-
-  console.log("[LibraryPage] Stories:", storiesRows);
-  console.log("[LibraryPage] Raw progressRows:", progressRows);
+  const [{ data: storiesRows }, { data: progressRows }] = await Promise.all([
+    supabase
+      .from("stories")
+      .select("uuid, story_title, word_count, reading_level, creation_date")
+      .eq("original_author_id", user.id)
+      .order("creation_date", { ascending: false }),
+    supabase
+      .from("user_progress")
+      .select("stories_uuid, reading_date, fun_grade")
+      .eq("user_id", user.id)
+      .order("reading_date", { ascending: false }),
+  ]);
 
   // Latest progress per story (first row per story due to order)
   const latestByStory = new Map<string, { reading_date: string; fun_grade: number | null }>();

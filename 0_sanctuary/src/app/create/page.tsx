@@ -2,14 +2,27 @@
 
 import Link from "next/link";
 import { FadeIn } from "../_components/FadeIn";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { queueStoryGeneration } from "./actions";
 
 const DIFFICULTY_OPTIONS = ["A2", "A2/B1", "B1", "B1/B2", "B2", "B2/C1", "C1"] as const;
 
-const COOLDOWN_SECONDS = 3;
+/** Long enough for success swipe + fade; re-tune if SUCCESS_SWIPE_MS / SUCCESS_FADE_MS change. */
+const COOLDOWN_SECONDS = 5;
+
+/** Bell-shaped easing so expand and collapse feel identical (slow → fast → slow). */
+const MORE_OPTIONS_PANEL_EASE = [0.83, 0, 0.17, 1] as const;
+const MORE_OPTIONS_PANEL_MS = 0.78;
+
+/** Slow-in / slow-out: gentle at both ends (bell-shaped easing, not “shoot from the bottom”). */
+const SUCCESS_SWIPE_EASE = "cubic-bezier(0.83, 0, 0.17, 1)";
+const SUCCESS_SWIPE_MS = 3400;
+/** Fits in the last ~1s tick before countdown ends (see effect: fade starts at countdown === 1). */
+const SUCCESS_FADE_MS = 900;
 
 export default function CreatePage() {
+  const shouldReduceMotion = useReducedMotion();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("");
   const [difficulty, setDifficulty] = useState<string | null>(null);
@@ -21,6 +34,7 @@ export default function CreatePage() {
   const [countdown, setCountdown] = useState(0);
   const [swipeStarted, setSwipeStarted] = useState(false);
   const [swipeDone, setSwipeDone] = useState(false);
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -125,8 +139,8 @@ export default function CreatePage() {
         </p>
       </header>
 
-      <p className="mb-6 text-center text-sm leading-relaxed text-slate-600 sm:text-left">
-        Leave the fields empty to use your profile&apos;s default settings.<br /> Or create one-off reading material with unique settings.
+      <p className="mb-6 text-center text-sm italic leading-relaxed text-slate-600 sm:text-left">
+        Leave fields empty to use your profile&apos;s default settings.<br /> Or play around with the settings below.
       </p>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
@@ -152,6 +166,67 @@ export default function CreatePage() {
           </div>
         </section>
 
+        <div className="border-t border-slate-200 pt-2">
+          <button
+            type="button"
+            id="create-more-options-label"
+            aria-expanded={moreOptionsOpen}
+            aria-controls="create-more-options-panel"
+            onClick={() => setMoreOptionsOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-left text-sm font-medium text-slate-800 transition-colors duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-white"
+          >
+            <span>More options</span>
+            <motion.span
+              className="inline-block text-slate-500"
+              aria-hidden
+              initial={false}
+              animate={{
+                rotate: moreOptionsOpen ? 180 : 0,
+              }}
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0.15 }
+                  : {
+                      duration: MORE_OPTIONS_PANEL_MS,
+                      ease: MORE_OPTIONS_PANEL_EASE,
+                    }
+              }
+            >
+              ▾
+            </motion.span>
+          </button>
+
+          <motion.div
+            id="create-more-options-panel"
+            role="region"
+            aria-labelledby="create-more-options-label"
+            aria-hidden={!moreOptionsOpen}
+            initial={false}
+            inert={!moreOptionsOpen ? true : undefined}
+            animate={
+              shouldReduceMotion
+                ? {
+                    maxHeight: moreOptionsOpen ? 2600 : 0,
+                    opacity: moreOptionsOpen ? 1 : 0,
+                    marginTop: moreOptionsOpen ? 16 : 0,
+                  }
+                : {
+                    maxHeight: moreOptionsOpen ? 2600 : 0,
+                    opacity: moreOptionsOpen ? 1 : 0,
+                    marginTop: moreOptionsOpen ? 16 : 0,
+                    y: moreOptionsOpen ? 0 : -10,
+                  }
+            }
+            transition={
+              shouldReduceMotion
+                ? { duration: 0.18, ease: "easeOut" }
+                : {
+                    duration: MORE_OPTIONS_PANEL_MS,
+                    ease: MORE_OPTIONS_PANEL_EASE,
+                  }
+            }
+            className="space-y-6 overflow-hidden"
+          >
         <section>
           <label className="block text-sm font-medium text-slate-1000">
             Tone or personality for the writer
@@ -243,6 +318,8 @@ export default function CreatePage() {
             placeholder="0–99 (optional)"
           />
         </section>
+          </motion.div>
+        </div>
 
         {error && (
           <p className="text-sm text-red-600">{error}</p>
@@ -251,7 +328,7 @@ export default function CreatePage() {
           <button
             type="submit"
             disabled={submitting || countdown > 0}
-            className="flex w-full items-center justify-center rounded-3xl bg-slate-900 px-4 py-3 text-sm font-semibold text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center rounded-3xl bg-slate-900 px-4 py-3 text-sm font-semibold text-[#FDFCFB] shadow-sm transition-[color,background-color,opacity,transform] duration-[1.45s] ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-slate-800 active:scale-[0.985] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 motion-reduce:transition-colors motion-reduce:duration-200"
           >
             {submitting
               ? "Queuing…"
@@ -284,12 +361,15 @@ export default function CreatePage() {
       {success && (
         <div className="fixed inset-0 z-40 overflow-hidden pointer-events-none">
           <div
-            className="absolute inset-0 bg-slate-900 transform"
+            className="absolute inset-0 bg-slate-900 transform motion-reduce:transition-none"
             style={{
               transitionProperty: "transform, opacity",
-              transitionDuration: "2000ms, 1000ms",
-              transitionTimingFunction:
-                "cubic-bezier(0.22, 1, 0.36, 1), ease-out",
+              transitionDuration: shouldReduceMotion
+                ? "220ms, 160ms"
+                : `${SUCCESS_SWIPE_MS}ms, ${SUCCESS_FADE_MS}ms`,
+              transitionTimingFunction: shouldReduceMotion
+                ? "ease-out, ease-out"
+                : `${SUCCESS_SWIPE_EASE}, ${SUCCESS_SWIPE_EASE}`,
               transform: swipeStarted ? "translateY(0%)" : "translateY(100%)",
               opacity: swipeDone ? 0 : 1,
             }}

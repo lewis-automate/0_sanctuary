@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, CircleHelp, Languages } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages, Lightbulb } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -17,6 +17,10 @@ import {
   nudgeSelectionExpandRight,
   nudgeSelectionShrinkFromRight,
 } from "@/lib/nudge-text-selection";
+import {
+  isReaderSelectionWithinLimit,
+  MAX_READER_SELECTION_GRAPHEMES,
+} from "@/lib/reader-selection-limit";
 
 type FontSize = "sm" | "md" | "lg";
 
@@ -25,6 +29,8 @@ const FONT_CLASSES: Record<FontSize, string> = {
   md: "text-lg leading-8",
   lg: "text-xl leading-9",
 };
+
+const READER_AI_WAIT_HINT = "Wait a moment...";
 
 type Props = {
   story: Story;
@@ -72,23 +78,15 @@ type TranslateAnchor = {
 };
 
 const TEXT_MARGIN_PX = 8;
-/** ~nudge + translate + Save + help + nudge; used to clamp toolbar before measure */
-const TOOLBAR_ESTIMATE_PX = 380;
 
-function clampCenterXInBounds(
-  centerX: number,
-  elementWidth: number,
-  bounds: DOMRect,
-  margin: number,
-): number {
-  const half = elementWidth / 2;
-  const minC = bounds.left + margin + half;
-  const maxC = bounds.right - margin - half;
-  if (minC > maxC) {
-    return (bounds.left + bounds.right) / 2;
-  }
-  return Math.min(Math.max(centerX, minC), maxC);
-}
+const TOOLBAR_CLUSTER =
+  "flex shrink-0 items-center rounded-full border border-slate-600/75 bg-slate-900 p-1 shadow-inner";
+
+const TOOLBAR_ICON_BTN =
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-500/55 bg-slate-800 text-[#FDFCFB] shadow-sm transition-colors hover:border-slate-400/70 hover:bg-slate-700 active:bg-slate-600 disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500 disabled:opacity-55 disabled:hover:bg-slate-800";
+
+const TOOLBAR_SAVE_BTN =
+  "inline-flex h-10 min-w-[3.5rem] shrink-0 items-center justify-center rounded-full border border-slate-500/55 bg-slate-800 px-3 text-xs font-semibold tracking-wide text-[#FDFCFB] shadow-sm transition-colors hover:border-slate-400/70 hover:bg-slate-700 active:bg-slate-600 disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500 disabled:opacity-55 disabled:hover:bg-slate-800";
 
 function clampLeftForCenteredWidth(
   centerX: number,
@@ -139,7 +137,6 @@ export function InteractiveStory({
   const [portalReady, setPortalReady] = useState(false);
   /** Re-read text-area bounds on scroll/resize while overlays are open */
   const [layoutTick, setLayoutTick] = useState(0);
-  const [toolbarWidth, setToolbarWidth] = useState(0);
 
   useEffect(() => {
     setPortalReady(true);
@@ -156,14 +153,6 @@ export function InteractiveStory({
     };
   }, [tooltip, translateOpen, grammarOpen]);
 
-  useLayoutEffect(() => {
-    if (!tooltip || !tooltipRef.current) {
-      setToolbarWidth(0);
-      return;
-    }
-    setToolbarWidth(tooltipRef.current.getBoundingClientRect().width);
-  }, [tooltip, layoutTick]);
-
   const handleFinishedReading = useCallback(async () => {
     setSaveError(null);
     setSaving(true);
@@ -175,7 +164,7 @@ export function InteractiveStory({
       engagement,
     });
     if (result.ok) {
-      router.push("/reader/done");
+      router.push("/continue");
     } else {
       setSaving(false);
       setSaveError(result.error ?? "Failed to save progress");
@@ -211,6 +200,8 @@ export function InteractiveStory({
 
       const anchor = selection.anchorNode;
       if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
+        // Tapping Translate/Grammar often collapses selection; keep the bar until the panel closes.
+        if (translateOpen || grammarOpen) return;
         setTooltip(null);
         return;
       }
@@ -227,7 +218,7 @@ export function InteractiveStory({
         text,
       });
     });
-  }, []);
+  }, [translateOpen, grammarOpen]);
 
   // Touches that end on selection handles (common on Android) do not bubble
   // touchend to the article, but selectionchange still fires when the range updates.
@@ -270,7 +261,7 @@ export function InteractiveStory({
   }, [showTooltipFromSelection]);
 
   const handleSaveVocab = useCallback(() => {
-    if (tooltip) {
+    if (tooltip && isReaderSelectionWithinLimit(tooltip.text)) {
       setSavedVocab((prev) => {
         if (prev.includes(tooltip.text) || prev.length >= 15) return prev;
         return [...prev, tooltip.text];
@@ -284,11 +275,23 @@ export function InteractiveStory({
     setSavedVocab((prev) => prev.filter((w) => w !== word));
   }, []);
 
+  const selectionWithinLimit = Boolean(
+    tooltip?.text && isReaderSelectionWithinLimit(tooltip.text),
+  );
   const canUseReaderAi =
-    Boolean(targetLanguage.trim() && nativeLanguage.trim()) && Boolean(tooltip?.text);
+    Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
+    Boolean(tooltip?.text) &&
+    selectionWithinLimit;
+  const readerAiDisabledTitle = !selectionWithinLimit
+    ? `Selection too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+    : !targetLanguage.trim() || !nativeLanguage.trim()
+      ? "Add target and native language in Settings"
+      : undefined;
+  const canSaveToVocab =
+    selectionWithinLimit && savedVocab.length < 15;
 
   const handleTranslate = useCallback(async () => {
-    if (!tooltip?.text.trim()) return;
+    if (!tooltip?.text.trim() || !isReaderSelectionWithinLimit(tooltip.text)) return;
     setTranslateAnchor({
       centerX: tooltip.centerX,
       top: tooltip.top,
@@ -339,7 +342,7 @@ export function InteractiveStory({
   }, [story.body, tooltip]);
 
   const handleGrammar = useCallback(async () => {
-    if (!tooltip?.text.trim()) return;
+    if (!tooltip?.text.trim() || !isReaderSelectionWithinLimit(tooltip.text)) return;
     setTranslateAnchor({
       centerX: tooltip.centerX,
       top: tooltip.top,
@@ -557,32 +560,18 @@ export function InteractiveStory({
             <AnimatePresence>
               {tooltip && (
                 <div
+                  ref={tooltipRef}
                   className="fixed z-50"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                   style={{
-                    left: (() => {
-                      void layoutTick;
-                      const bounds = containerRef.current?.getBoundingClientRect();
-                      const barW = Math.max(
-                        toolbarWidth || TOOLBAR_ESTIMATE_PX,
-                        200,
-                      );
-                      if (!bounds) {
-                        return tooltip.centerX;
-                      }
-                      return clampCenterXInBounds(
-                        tooltip.centerX,
-                        barW,
-                        bounds,
-                        TEXT_MARGIN_PX,
-                      );
-                    })(),
+                    left: "50%",
                     top: tooltip.top - 8,
                     transform: "translate(-50%, -100%)",
                   }}
                 >
                   <motion.div
-                    ref={tooltipRef}
-                    className="flex items-center gap-1 rounded-full bg-slate-900 px-1.5 py-1.5 shadow-lg"
+                    className="flex items-center gap-3 rounded-full border border-slate-600/60 bg-slate-950/40 p-2 shadow-lg ring-1 ring-slate-800/80 backdrop-blur-sm"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{
@@ -591,74 +580,86 @@ export function InteractiveStory({
                       transition: { duration: 0.2, ease: "easeOut" },
                     }}
                   >
-                    <button
-                      type="button"
-                      title="Remove one character from the right"
-                      aria-label="Remove one character from the right side of the selection"
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNudgeSelectionLeft();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800"
-                    >
-                      <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canUseReaderAi}
-                      title={
-                        !targetLanguage.trim() || !nativeLanguage.trim()
-                          ? "Add target and native language in Settings"
-                          : "Translate"
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleTranslate();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-60"
-                      aria-label="Translate"
-                    >
-                      <Languages className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveVocab}
-                      disabled={savedVocab.length >= 15}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canUseReaderAi}
-                      title={
-                        !targetLanguage.trim() || !nativeLanguage.trim()
-                          ? "Add target and native language in Settings"
-                          : "Grammar help"
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleGrammar();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500 disabled:opacity-60"
-                      aria-label="Grammar help"
-                    >
-                      <CircleHelp className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      title="Add one character on the right"
-                      aria-label="Add one character to the right side of the selection"
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNudgeSelectionRight();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#FDFCFB] transition-colors hover:bg-slate-800"
-                    >
-                      <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
-                    </button>
+                    <div className={TOOLBAR_CLUSTER}>
+                      <button
+                        type="button"
+                        title="Remove one character from the right"
+                        aria-label="Remove one character from the right side of the selection"
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNudgeSelectionLeft();
+                        }}
+                        className={TOOLBAR_ICON_BTN}
+                      >
+                        <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+                      </button>
+                    </div>
+                    <div className={`${TOOLBAR_CLUSTER} gap-1.5`}>
+                      <button
+                        type="button"
+                        disabled={!canUseReaderAi}
+                        title={readerAiDisabledTitle ?? "Translate"}
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleTranslate();
+                        }}
+                        className={TOOLBAR_ICON_BTN}
+                        aria-label="Translate"
+                      >
+                        <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        title={
+                          !selectionWithinLimit
+                            ? `Selection too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+                            : savedVocab.length >= 15
+                              ? "Saved vocab limit reached (15)"
+                              : "Save to vocab list"
+                        }
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveVocab();
+                        }}
+                        disabled={!canSaveToVocab}
+                        className={TOOLBAR_SAVE_BTN}
+                        aria-label="Save to vocab list"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canUseReaderAi}
+                        title={readerAiDisabledTitle ?? "Grammar explanation"}
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleGrammar();
+                        }}
+                        className={TOOLBAR_ICON_BTN}
+                        aria-label="Grammar explanation"
+                      >
+                        <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
+                      </button>
+                    </div>
+                    <div className={TOOLBAR_CLUSTER}>
+                      <button
+                        type="button"
+                        title="Add one character on the right"
+                        aria-label="Add one character to the right side of the selection"
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNudgeSelectionRight();
+                        }}
+                        className={TOOLBAR_ICON_BTN}
+                      >
+                        <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
+                      </button>
+                    </div>
                   </motion.div>
                 </div>
               )}
@@ -684,6 +685,7 @@ export function InteractiveStory({
                       setGrammarOpen(false);
                       setGrammarError(null);
                       setTranslateAnchor(null);
+                      requestAnimationFrame(() => showTooltipFromSelection());
                     }}
                   />
                   {/* Horizontally clamped to the story text column (not full viewport). */}
@@ -753,6 +755,7 @@ export function InteractiveStory({
                             setGrammarOpen(false);
                             setGrammarError(null);
                             setTranslateAnchor(null);
+                            requestAnimationFrame(() => showTooltipFromSelection());
                           }}
                           className="rounded-full px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-900/5"
                         >
@@ -761,12 +764,22 @@ export function InteractiveStory({
                       </div>
                       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2">
                         {translateOpen && translateLoading && (
-                          <p className="text-sm text-slate-500">Translating…</p>
+                          <div className="space-y-1">
+                            <p className="text-sm text-slate-500">Translating…</p>
+                            <p className="text-xs text-slate-400">
+                              {READER_AI_WAIT_HINT}
+                            </p>
+                          </div>
                         )}
                         {grammarOpen && grammarLoading && (
-                          <p className="text-sm text-slate-500">
-                            Getting a grammar note…
-                          </p>
+                          <div className="space-y-1">
+                            <p className="text-sm text-slate-500">
+                              Getting a grammar note…
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {READER_AI_WAIT_HINT}
+                            </p>
+                          </div>
                         )}
                         {translateOpen && !translateLoading && translateError && (
                           <p className="text-sm text-red-600">{translateError}</p>

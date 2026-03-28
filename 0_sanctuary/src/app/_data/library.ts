@@ -13,7 +13,7 @@ export type LibraryItem = {
    read_count: number;
 };
 
-export type LibrarySortKey = "last_read" | "difficulty" | "rating";
+export type LibrarySortKey = "created" | "times_read" | "rating";
 
 export function sortLibraryItems(
   items: LibraryItem[],
@@ -22,24 +22,22 @@ export function sortLibraryItems(
 ): LibraryItem[] {
   const sorted = [...items];
   switch (sortKey) {
-    case "last_read":
+    case "created":
       sorted.sort((a, b) => {
-        const da = a.reading_date ? new Date(a.reading_date).getTime() : null;
-        const db = b.reading_date ? new Date(b.reading_date).getTime() : null;
-
-        // For "most recent", treat unread (null) as most recent when sorting desc.
-        const va = da ?? Number.POSITIVE_INFINITY;
-        const vb = db ?? Number.POSITIVE_INFINITY;
-
-        return direction === "desc" ? vb - va : va - vb;
+        const ta = a.creation_date
+          ? new Date(a.creation_date).getTime()
+          : 0;
+        const tb = b.creation_date
+          ? new Date(b.creation_date).getTime()
+          : 0;
+        return direction === "desc" ? tb - ta : ta - tb;
       });
       break;
-    case "difficulty":
+    case "times_read":
       sorted.sort((a, b) => {
-        const cmp = (a.reading_level ?? "").localeCompare(
-          b.reading_level ?? "",
-        );
-        return direction === "asc" ? cmp : -cmp;
+        const ca = a.read_count;
+        const cb = b.read_count;
+        return direction === "desc" ? cb - ca : ca - cb;
       });
       break;
     case "rating":

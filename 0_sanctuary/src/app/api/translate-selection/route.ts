@@ -4,6 +4,10 @@ import {
   extractJsonObjectStringField,
   truncatePromptContext,
 } from "@/lib/extract-json-string-field";
+import {
+  countReaderSelectionGraphemes,
+  MAX_READER_SELECTION_GRAPHEMES,
+} from "@/lib/reader-selection-limit";
 import { getUserLanguagePair } from "@/lib/user-languages";
 import { createClient } from "@/lib/supabase/server";
 
@@ -128,7 +132,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
   }
 
-  const longHighlight = text.length > 200;
+  if (countReaderSelectionGraphemes(text) > MAX_READER_SELECTION_GRAPHEMES) {
+    return NextResponse.json(
+      {
+        error: `Selection is too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters). Shorten the highlight.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const longHighlight = countReaderSelectionGraphemes(text) > 120;
   const prompt = `Translate the highlighted text from ${targetLanguage} to ${nativeLanguage}.
 
 Highlighted text:

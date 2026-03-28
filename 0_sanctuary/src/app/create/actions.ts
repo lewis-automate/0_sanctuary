@@ -1,15 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import type { StoryGenPayload } from "./story-gen-payload";
 
-export type StoryGenPayload = {
-  topic?: string;
-  tone?: string;
-  difficulty?: string;
-  word_count?: string;
-  /** Override profile default; omit to use settings `last_stories_filter`. */
-  last_stories_filter?: number;
-};
+export type { StoryGenPayload } from "./story-gen-payload";
 
 export async function queueStoryGeneration(payload: StoryGenPayload): Promise<
   | { ok: true; jobId: string }

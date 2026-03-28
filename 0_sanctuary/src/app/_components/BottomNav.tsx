@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FilePenLine, Home, LibraryBig, NotebookPen, Settings } from "lucide-react";
+import {
+  FilePenLine,
+  Home,
+  LibraryBig,
+  NotebookPen,
+  SquarePen,
+} from "lucide-react";
 
 type Tab = {
   href: string;
-  label: "Create" | "Library" | "Home" | "Review" | "Settings";
+  label: "Create" | "Library" | "Home" | "Vocab" | "Writing";
   Icon: typeof LibraryBig;
 };
 
@@ -14,8 +20,8 @@ const tabs: Tab[] = [
   { href: "/create", label: "Create", Icon: FilePenLine },
   { href: "/library", label: "Library", Icon: LibraryBig },
   { href: "/", label: "Home", Icon: Home },
-  { href: "/review", label: "Review", Icon: NotebookPen },
-  { href: "/settings", label: "Settings", Icon: Settings },
+  { href: "/vocab", label: "Vocab", Icon: NotebookPen },
+  { href: "/writing", label: "Writing", Icon: SquarePen },
 ];
 
 export function BottomNav() {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { AppShell } from "./_components/AppShell";
 
@@ -34,7 +35,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cormorant.variable} antialiased`}
       >
-        <AppShell>{children}</AppShell>
+        <Suspense
+          fallback={
+            <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
+              <main className="mx-auto w-full max-w-md px-6 pb-28 pt-10">
+                {children}
+              </main>
+            </div>
+          }
+        >
+          <AppShell>{children}</AppShell>
+        </Suspense>
       </body>
     </html>
   );

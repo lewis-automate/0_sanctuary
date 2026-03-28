@@ -81,35 +81,40 @@ export function CurrentActivities() {
     };
   }, [router]);
 
-  if (!userId || activities.length === 0) return null;
+  if (!userId) {
+    return (
+      <p className="text-sm text-slate-500">Checking for active processes…</p>
+    );
+  }
+
+  if (activities.length === 0) {
+    return (
+      <p className="text-sm text-slate-500">No active processes right now.</p>
+    );
+  }
 
   return (
-    <section className="mb-6">
-      <h2 className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-        Current activities
-      </h2>
-      <div className="mt-3 space-y-2">
-        {activities.map((a) => (
-          <div
-            key={a.id}
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
-          >
-            <span
-              className="h-2 w-2 shrink-0 rounded-full bg-slate-400 animate-pulse"
-              aria-hidden
-            />
-            <span className="text-sm text-slate-700">
-              {a.event_type === "story_gen"
-                ? "creating story..."
-                : a.event_type === "progress_update"
-                  ? "progressing reading session..."
-                  : a.event_type === "user_settings"
-                    ? "processing user settings..."
-                    : "Processing…"}
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className="space-y-2">
+      {activities.map((a) => (
+        <div
+          key={a.id}
+          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
+        >
+          <span
+            className="h-2 w-2 shrink-0 rounded-full bg-slate-400 animate-pulse"
+            aria-hidden
+          />
+          <span className="text-sm text-slate-700">
+            {a.event_type === "story_gen"
+              ? "creating story..."
+              : a.event_type === "progress_update"
+                ? "progressing reading session..."
+                : a.event_type === "user_settings"
+                  ? "processing user settings..."
+                  : "Processing…"}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }

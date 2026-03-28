@@ -4,6 +4,10 @@ import {
   extractJsonObjectStringField,
   truncatePromptContext,
 } from "@/lib/extract-json-string-field";
+import {
+  countReaderSelectionGraphemes,
+  MAX_READER_SELECTION_GRAPHEMES,
+} from "@/lib/reader-selection-limit";
 import { getUserLanguagePair } from "@/lib/user-languages";
 import { createClient } from "@/lib/supabase/server";
 
@@ -118,6 +122,15 @@ export async function POST(request: Request) {
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
+  }
+
+  if (countReaderSelectionGraphemes(text) > MAX_READER_SELECTION_GRAPHEMES) {
+    return NextResponse.json(
+      {
+        error: `Selection is too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters). Shorten the highlight.`,
+      },
+      { status: 400 },
+    );
   }
 
   const prompt = `You help someone learning ${targetLanguage} while they read authentic text.

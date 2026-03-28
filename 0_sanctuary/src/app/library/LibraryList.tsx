@@ -6,8 +6,8 @@ import type { LibraryItem, LibrarySortKey } from "../_data/library";
 import { sortLibraryItems } from "../_data/library";
 
 const SORT_LABELS: Record<LibrarySortKey, string> = {
-  last_read: "Last read",
-  difficulty: "Difficulty",
+  created: "Created",
+  times_read: "Times read",
   rating: "Rating",
 };
 
@@ -22,13 +22,18 @@ function formatDateYMD(iso: string | null): string {
 }
 
 export function LibraryList({ items: initialItems }: Props) {
-  const [sortKey, setSortKey] = useState<LibrarySortKey>("last_read");
+  const [sortKey, setSortKey] = useState<LibrarySortKey>("created");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const items = sortLibraryItems(initialItems, sortKey, sortDirection);
+  const [unreadOnly, setUnreadOnly] = useState(true);
+
+  const sorted = sortLibraryItems(initialItems, sortKey, sortDirection);
+  const items = unreadOnly
+    ? sorted.filter((i) => i.read_count === 0)
+    : sorted;
 
   return (
     <>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
         {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map((key) => (
           <button
             key={key}
@@ -38,8 +43,7 @@ export function LibraryList({ items: initialItems }: Props) {
                 setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
               } else {
                 setSortKey(key);
-                // Sensible defaults per key
-                setSortDirection(key === "difficulty" ? "asc" : "desc");
+                setSortDirection("desc");
               }
             }}
             className={`inline-flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
@@ -56,11 +60,24 @@ export function LibraryList({ items: initialItems }: Props) {
             )}
           </button>
         ))}
+        <label className="inline-flex cursor-pointer items-center gap-2 pl-1 text-sm font-medium text-slate-700">
+          <input
+            type="checkbox"
+            checked={unreadOnly}
+            onChange={(e) => setUnreadOnly(e.target.checked)}
+            className="h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-950 focus:ring-slate-950"
+          />
+          Unread only
+        </label>
       </div>
 
       <div className="mt-6 space-y-3">
-        {items.length === 0 ? (
+        {initialItems.length === 0 ? (
           <p className="text-center text-slate-600">No stories yet.</p>
+        ) : items.length === 0 ? (
+          <p className="text-center text-slate-600">
+            No stories match this filter.
+          </p>
         ) : (
           items.map((item) => {
             const hasReads = item.read_count > 0;
