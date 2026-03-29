@@ -189,11 +189,11 @@ export default async function HomePage() {
                 Read an unread passage from your library
               </span>
             </Link>
-            <Link href="/add-vocab" className={`${quickActionBtn} h-full`}>
+            <Link href="/vocab?tab=add" className={`${quickActionBtn} h-full`}>
               <span className={quickActionTitle}>Add vocab</span>
               <span className={quickActionSub}>Add vocabulary freely</span>
             </Link>
-            <Link href="/writer" className={`${quickActionBtn} h-full`}>
+            <Link href="/writing?tab=writenow" className={`${quickActionBtn} h-full`}>
               <span className={quickActionTitle}>Write freely</span>
               <span className={quickActionSub}>
                 Write freely and receive feedback on your writing

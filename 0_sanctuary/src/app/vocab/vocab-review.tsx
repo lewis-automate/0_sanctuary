@@ -2,7 +2,9 @@
 
 import { Bookmark, ListChecks, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
 import { AddVocabScreen } from "./AddVocabScreen";
 import { FiveSentencesSession } from "./FiveSentencesSession";
 import { RapidReviewSession } from "./RapidReviewSession";
@@ -82,6 +84,57 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
   const [error, setError] = useState<string | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportCsvError, setExportCsvError] = useState<string | null>(null);
+  const [rapidReviewReportPending, setRapidReviewReportPending] =
+    useState(false);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    let mounted = true;
+    let channel: RealtimeChannel | null = null;
+
+    async function refreshRapidReviewPending(userId: string) {
+      const { data } = await supabase
+        .from("activity_queue")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("event_type", "rapid_review_complete")
+        .in("status", ["pending", "processing"]);
+      if (mounted) {
+        setRapidReviewReportPending(
+          Array.isArray(data) && data.length > 0,
+        );
+      }
+    }
+
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
+      if (!mounted) return;
+      if (!user) {
+        setRapidReviewReportPending(false);
+        return;
+      }
+      void refreshRapidReviewPending(user.id);
+      channel = supabase
+        .channel("vocab_rapid_review_report_pending")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "activity_queue",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            void refreshRapidReviewPending(user.id);
+          },
+        )
+        .subscribe();
+    });
+
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,10 +264,6 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
         {activeTab === "saved" && (
           <section aria-label="Saved words" className="space-y-4 text-sm text-slate-700">
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p className="text-xs text-slate-500">
-                Coming soon: archive buttons and the option to save words in
-                isolation (they are automatically chunked into pairs by default).
-              </p>
               <button
                 type="button"
                 onClick={downloadStudyItemsCsv}
@@ -301,16 +350,46 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
                 <button
                   type="button"
                   onClick={enterImmersiveHyperFocus}
-                  className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 sm:min-w-[10rem] sm:flex-initial"
+                  className="inline-flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full border border-slate-200 bg-white px-4 py-3 text-center shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 sm:min-w-[10rem] sm:flex-initial"
                 >
-                  Hyper focus
+                  <span className="text-sm font-medium text-slate-900">
+                    Hyper focus
+                  </span>
+                  <span className="text-xs font-normal text-slate-600">
+                    Focus on learning one word or prhase
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={enterImmersiveRapidReview}
-                  className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 sm:min-w-[10rem] sm:flex-initial"
+                  disabled={rapidReviewReportPending}
+                  className={[
+                    "inline-flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full border px-4 py-3 text-center shadow-sm transition-colors sm:min-w-[10rem] sm:flex-initial",
+                    rapidReviewReportPending
+                      ? "cursor-not-allowed border-slate-200/80 bg-slate-100/90 text-slate-500 opacity-90"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
                 >
-                  Rapid review
+                  <span
+                    className={
+                      rapidReviewReportPending
+                        ? "text-sm font-medium text-slate-500"
+                        : "text-sm font-medium text-slate-900"
+                    }
+                  >
+                    {rapidReviewReportPending ? "Processing…" : "Rapid review"}
+                  </span>
+                  <span
+                    className={
+                      rapidReviewReportPending
+                        ? "text-xs font-normal text-slate-500"
+                        : "text-xs font-normal text-slate-600"
+                    }
+                  >
+                    {rapidReviewReportPending
+                      ? "Last session is still syncing"
+                      : "Review up to 10 words"}
+                  </span>
                 </button>
               </div>
             ) : null}

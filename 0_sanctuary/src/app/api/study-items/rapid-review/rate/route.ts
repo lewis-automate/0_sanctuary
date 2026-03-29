@@ -33,14 +33,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const id =
-    body && typeof body === "object" && "id" in body && typeof body.id === "string"
-      ? body.id
+  const rawId =
+    body && typeof body === "object" && "id" in body
+      ? (body as { id: unknown }).id
       : null;
+  const id =
+    typeof rawId === "string"
+      ? rawId.trim()
+      : typeof rawId === "number" && Number.isFinite(rawId)
+        ? String(Math.trunc(rawId))
+        : null;
   const rating =
     body && typeof body === "object" && "rating" in body ? body.rating : null;
 
-  if (!id?.trim()) {
+  if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
   if (!isRating(rating)) {
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
 
   const { data: row, error: fetchError } = await supabase
     .from("study_items")
-    .select("mastery_score")
+    .select("mastery_score, times_used")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -68,12 +74,21 @@ export async function POST(req: Request) {
       : typeof raw === "string" && Number.isFinite(parseFloat(raw))
         ? parseFloat(raw)
         : 0;
+  const rawUses = row.times_used as unknown;
+  const timesUsedBefore =
+    typeof rawUses === "number" && Number.isFinite(rawUses)
+      ? Math.max(0, Math.trunc(rawUses))
+      : typeof rawUses === "string" && Number.isFinite(parseInt(rawUses, 10))
+        ? Math.max(0, parseInt(rawUses, 10))
+        : 0;
+
   const next = Math.max(0, Math.min(100, current + DELTA[rating]));
   const last_used = new Date().toISOString();
+  const times_used = timesUsedBefore + 1;
 
   const { error: updateError } = await supabase
     .from("study_items")
-    .update({ mastery_score: next, last_used })
+    .update({ mastery_score: next, last_used, times_used })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -81,5 +96,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, mastery_score: next });
+  return NextResponse.json({
+    ok: true,
+    mastery_score: next,
+    mastery_score_before_rating: current,
+    times_used_before_rating: timesUsedBefore,
+  });
 }

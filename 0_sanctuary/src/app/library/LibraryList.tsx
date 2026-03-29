@@ -31,10 +31,14 @@ export function LibraryList({ items: initialItems }: Props) {
     ? sorted.filter((i) => i.read_count === 0)
     : sorted;
 
+  const sortKeys: LibrarySortKey[] = unreadOnly
+    ? ["created"]
+    : (Object.keys(SORT_LABELS) as LibrarySortKey[]);
+
   return (
     <>
       <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2">
-        {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map((key) => (
+        {sortKeys.map((key) => (
           <button
             key={key}
             type="button"
@@ -54,17 +58,32 @@ export function LibraryList({ items: initialItems }: Props) {
           >
             <span>{SORT_LABELS[key]}</span>
             {key === sortKey && (
-              <span className="text-xs">
+              <span
+                className="ml-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/18 text-base font-bold leading-none text-[#FDFCFB]"
+                aria-hidden
+              >
                 {sortDirection === "asc" ? "↑" : "↓"}
               </span>
             )}
           </button>
         ))}
-        <label className="inline-flex cursor-pointer items-center gap-2 pl-1 text-sm font-medium text-slate-700">
+      </div>
+      <div className="mt-2">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
           <input
             type="checkbox"
             checked={unreadOnly}
-            onChange={(e) => setUnreadOnly(e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setUnreadOnly(checked);
+              if (
+                checked &&
+                (sortKey === "times_read" || sortKey === "rating")
+              ) {
+                setSortKey("created");
+                setSortDirection("desc");
+              }
+            }}
             className="h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-950 focus:ring-slate-950"
           />
           Unread only
@@ -109,13 +128,15 @@ export function LibraryList({ items: initialItems }: Props) {
                   <span>Difficulty: {item.reading_level || "—"}</span>
                   <span>{item.word_count.toLocaleString()} words</span>
                 </div>
-                <div className={metaClasses}>
-                  <span>Times read: {item.read_count}</span>
-                  <span>
-                    Engagement:{" "}
-                    {item.fun_grade != null ? item.fun_grade : "—"}
-                  </span>
-                </div>
+                {!unreadOnly && (
+                  <div className={metaClasses}>
+                    <span>Times read: {item.read_count}</span>
+                    <span>
+                      Engagement:{" "}
+                      {item.fun_grade != null ? item.fun_grade : "—"}
+                    </span>
+                  </div>
+                )}
               </Link>
             );
           })

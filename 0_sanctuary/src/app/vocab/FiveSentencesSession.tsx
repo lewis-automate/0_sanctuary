@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { queueHyperFocusComplete } from "./study-queue-actions";
 
 type SentenceItem = { sentence: string; reference: string };
 
@@ -131,13 +132,20 @@ export function FiveSentencesSession({ onBack, onComplete }: Props) {
     };
   }, []);
 
-  const goNext = useCallback(() => {
+  const goNext = useCallback(async () => {
     if (!data) return;
     if (stepIndex < 5) {
       setStepIndex((i) => i + 1);
-    } else {
-      onComplete();
+      return;
     }
+    await queueHyperFocusComplete({
+      study_item_id: data.studyItemId,
+      vocab: data.vocab,
+      explanation: data.explanation,
+      dissected: data.dissected,
+      sentences: data.sentences,
+    });
+    onComplete();
   }, [data, onComplete, stepIndex]);
 
   const goPrev = useCallback(() => {
@@ -275,7 +283,11 @@ export function FiveSentencesSession({ onBack, onComplete }: Props) {
         >
           Previous
         </button>
-        <button type="button" onClick={goNext} className={btnNext}>
+        <button
+          type="button"
+          onClick={() => void goNext()}
+          className={btnNext}
+        >
           {stepIndex === 5 ? "Finish" : "Next"}
         </button>
       </div>

@@ -24,6 +24,8 @@ export function AppShell({ children }: PropsWithChildren) {
 
   const chromeHidden = hideNav || immersiveVocab;
 
+  const onMainSettingsHub = pathname === "/settings";
+
   const mainPadding = chromeHidden
     ? immersiveVocab
       ? "pb-6 pt-[max(1rem,env(safe-area-inset-top))]"
@@ -32,7 +34,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   return (
     <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
-      {!chromeHidden ? (
+      {!chromeHidden && !onMainSettingsHub ? (
         <Link
           href="/settings"
           className="fixed right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-[60] rounded-full border border-slate-200 bg-[#fbf5ef]/90 p-2.5 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20"

@@ -179,23 +179,26 @@ export default async function SettingsPage({ searchParams }: PageProps) {
 
   return (
     <FadeIn className="mx-auto w-full max-w-prose">
-      <Link
-        href="/"
-        className="fixed left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-[60] rounded-full border border-slate-200 bg-[#fbf5ef]/90 p-2.5 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20"
-        aria-label="Back to home"
-      >
-        <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
-      </Link>
-
-      <header className="mb-4 text-center sm:text-left">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-          Settings
-        </p>
-        {message && (
-          <p className="mt-2 text-sm text-slate-600">
-            {decodeURIComponent(message.replace(/\+/g, " "))}
-          </p>
-        )}
+      <header className="mb-4">
+        <div className="flex items-start gap-3 sm:items-center">
+          <Link
+            href="/"
+            className="mt-0.5 inline-flex shrink-0 rounded-full border border-slate-200 bg-[#fbf5ef]/90 p-2.5 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20 sm:mt-0"
+            aria-label="Back to home"
+          >
+            <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
+          </Link>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+              Settings
+            </p>
+            {message && (
+              <p className="mt-2 text-sm text-slate-600">
+                {decodeURIComponent(message.replace(/\+/g, " "))}
+              </p>
+            )}
+          </div>
+        </div>
       </header>
 
       <div className="mb-5 flex gap-2 text-sm font-medium text-slate-600">

@@ -43,7 +43,7 @@ export function ReaderContent({
       <FadeIn className="mx-auto w-full max-w-prose">
         <header className="text-center">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-            Sanctuary • {story.language} • {story.difficulty}
+            {story.language} • {story.difficulty}
           </p>
           <h1 className="mt-2 font-serif text-4xl font-semibold leading-tight tracking-tight text-slate-900">
             {story.title}

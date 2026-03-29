@@ -139,8 +139,8 @@ export default function CreatePage() {
         </p>
       </header>
 
-      <p className="mb-6 text-center text-sm italic leading-relaxed text-slate-600 sm:text-left">
-        Leave fields empty to use your profile&apos;s default settings.<br /> Or play around with the settings below.
+      <p className="mb-6 text-left text-sm italic leading-relaxed text-slate-600 sm:text-left">
+      Empty fields will use your default settings.
       </p>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
@@ -148,9 +148,6 @@ export default function CreatePage() {
           <label className="block text-sm font-medium text-slate-1000">
             Choose a topic
           </label>
-          <p className="mt-1 text-xs text-slate-500">
-            The what...
-          </p>
           <div className="relative mt-3">
             <textarea
               rows={3}
@@ -158,7 +155,7 @@ export default function CreatePage() {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 px-3 py-3 pb-8 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
-              placeholder="Example: Tell me about a unique peculiarity of <target language> culture..."
+              placeholder="What do you want the writing to be about...?"
             />
             <span className="absolute bottom-3 right-3 text-xs text-slate-400">
               {topic.length}/200
@@ -334,7 +331,7 @@ export default function CreatePage() {
               ? "Queuing…"
               : countdown > 0
                 ? `Submit again in ${countdown}s`
-                : "Write story"}
+                : "Write"}
           </button>
         </div>
       </form>

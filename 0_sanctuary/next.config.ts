@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      { source: "/add-vocab", destination: "/vocab?tab=add", permanent: true },
+      { source: "/writer", destination: "/writing?tab=writenow", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

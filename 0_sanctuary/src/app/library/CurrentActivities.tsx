@@ -9,65 +9,116 @@ type Activity = {
   id: string;
   event_type: string;
   status: string;
+  created_at: string | null;
 };
+
+const TIMEOUT_MS = 10 * 60 * 1000;
+
+function progressingTitle(eventType: string): string {
+  switch (eventType) {
+    case "story_gen":
+      return "Progressing story creation";
+    case "progress_update":
+      return "Progressing read story";
+    case "user_settings":
+      return "Progressing user settings";
+    case "feedback_reviewed":
+      return "Progressing writing feedback";
+    case "hyper_focus_complete":
+      return "Progressing hyper focus session";
+    case "rapid_review_complete":
+      return "Progressing rapid review";
+    case "write_now_submit":
+      return "Progressing write now";
+    case "add_vocab_submit":
+      return "Progressing add vocab";
+    default:
+      return "Progressing background task";
+  }
+}
+
+function statusLabel(status: string): string {
+  const s = status.trim().toLowerCase();
+  if (s === "pending") return "Pending";
+  if (s === "processing") return "Processing";
+  if (s === "failed") return "Failed";
+  return status.replace(/_/g, " ");
+}
+
+function isTimedOut(a: Activity, nowMs: number): boolean {
+  if (a.status === "failed") return true;
+  if (a.status !== "pending" && a.status !== "processing") return false;
+  if (!a.created_at) return false;
+  const started = new Date(a.created_at).getTime();
+  if (!Number.isFinite(started)) return false;
+  return nowMs - started > TIMEOUT_MS;
+}
 
 export function CurrentActivities() {
   const router = useRouter();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const channelRef = useRef<RealtimeChannel | null>(null);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabase();
     let mounted = true;
 
-    supabase.auth.getUser().then(({ data: { user } }: any) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
       if (!mounted || !user) return;
       setUserId(user.id);
 
       const channel = supabase
         .channel("activity_queue")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "activity_queue",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const row = payload.new as Activity;
-            if (row.status !== "completed") {
-              setActivities((prev) => [...prev.filter((a) => a.id !== row.id), row]);
-            }
-          } else if (payload.eventType === "UPDATE") {
-            const row = payload.new as Activity;
-            if (row.status === "completed") {
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "activity_queue",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (payload.eventType === "INSERT") {
+              const row = payload.new as Activity;
+              if (row.status !== "completed") {
+                setActivities((prev) => [...prev.filter((a) => a.id !== row.id), row]);
+              }
+            } else if (payload.eventType === "UPDATE") {
+              const row = payload.new as Activity;
+              if (row.status === "completed") {
+                setActivities((prev) => prev.filter((a) => a.id !== row.id));
+                router.refresh();
+              } else {
+                setActivities((prev) =>
+                  prev.map((a) => (a.id === row.id ? row : a)),
+                );
+              }
+            } else if (payload.eventType === "DELETE") {
+              const row = payload.old as Activity;
               setActivities((prev) => prev.filter((a) => a.id !== row.id));
               router.refresh();
-            } else {
-              setActivities((prev) =>
-                prev.map((a) => (a.id === row.id ? row : a)),
-              );
             }
-          } else if (payload.eventType === "DELETE") {
-            const row = payload.old as Activity;
-            setActivities((prev) => prev.filter((a) => a.id !== row.id));
-            router.refresh();
-          }
-        },
+          },
         )
         .subscribe();
       channelRef.current = channel;
 
       supabase
         .from("activity_queue")
-        .select("id, event_type, status")
+        .select("id, event_type, status, created_at")
         .eq("user_id", user.id)
         .in("status", ["pending", "processing", "failed"])
         .then(({ data }) => {
-          if (mounted && data?.length) setActivities(data);
+          if (mounted && data?.length) {
+            setActivities(data as Activity[]);
+          }
         });
     });
 
@@ -95,26 +146,57 @@ export function CurrentActivities() {
 
   return (
     <div className="space-y-2">
-      {activities.map((a) => (
-        <div
-          key={a.id}
-          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3"
-        >
-          <span
-            className="h-2 w-2 shrink-0 rounded-full bg-slate-400 animate-pulse"
-            aria-hidden
-          />
-          <span className="text-sm text-slate-700">
-            {a.event_type === "story_gen"
-              ? "creating story..."
-              : a.event_type === "progress_update"
-                ? "progressing reading session..."
-                : a.event_type === "user_settings"
-                  ? "processing user settings..."
-                  : "Processing…"}
-          </span>
-        </div>
-      ))}
+      {activities.map((a) => {
+        const timedOut = isTimedOut(a, nowTick);
+        return (
+          <div
+            key={a.id}
+            className={[
+              "flex items-start gap-3 rounded-2xl border px-4 py-3",
+              timedOut
+                ? "border-amber-200 bg-amber-50/80"
+                : "border-slate-200 bg-white/80",
+            ].join(" ")}
+          >
+            {!timedOut ? (
+              <span
+                className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500/90 animate-pulse"
+                aria-hidden
+              />
+            ) : (
+              <span
+                className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-500"
+                aria-hidden
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              {timedOut ? (
+                <>
+                  <p className="text-sm font-medium text-amber-950">
+                    Timed out
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-700">
+                    This task did not finish within 10 minutes or could not be
+                    completed. Please contact me so I can sort it out.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {progressingTitle(a.event_type)} · {statusLabel(a.status)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-slate-900">
+                    {progressingTitle(a.event_type)}
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {statusLabel(a.status)}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

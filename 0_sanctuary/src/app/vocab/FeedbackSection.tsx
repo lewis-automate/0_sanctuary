@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  BookCheck,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Copy } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { queueFeedbackReviewed } from "./actions";
+import { useEffect, useMemo, useState } from "react";
 
 type FeedbackItem = {
   id: string;
@@ -16,6 +10,7 @@ type FeedbackItem = {
   alternate_version: string | null;
   feedback: string | null;
   focus_point: string | null;
+  /** Set server-side when a review session is completed (not toggled from this UI). */
   reviewed: boolean;
 };
 
@@ -33,13 +28,8 @@ export function FeedbackSection({
   );
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
-  const [feedbackPatchError, setFeedbackPatchError] = useState<string | null>(
-    null,
-  );
-  const [patchingFeedbackId, setPatchingFeedbackId] = useState<string | null>(
-    null,
-  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [unreviewedOnly, setUnreviewedOnly] = useState(true);
 
   useEffect(() => {
     if (!copiedId) return;
@@ -61,7 +51,11 @@ export function FeedbackSection({
         if (!cancelled) {
           setFeedbackItems(
             (data.items ?? []).map((it) => ({
-              ...it,
+              id: it.id,
+              raw_input: it.raw_input,
+              alternate_version: it.alternate_version,
+              feedback: it.feedback,
+              focus_point: it.focus_point,
               reviewed: !!it.reviewed,
             })),
           );
@@ -84,33 +78,22 @@ export function FeedbackSection({
     };
   }, []);
 
-  async function submitFeedbackReviewed(
-    id: string,
-    reviewed: boolean,
-    focus_point: string | null,
-  ) {
-    setFeedbackPatchError(null);
-    setPatchingFeedbackId(id);
-    try {
-      const result = await queueFeedbackReviewed({
-        feedback_id: id,
-        reviewed,
-        focus_point,
-      });
-      if (!result.ok) {
-        throw new Error(result.error);
-      }
-      setFeedbackItems((items) =>
-        items.map((it) => (it.id === id ? { ...it, reviewed } : it)),
-      );
-    } catch (e) {
-      setFeedbackPatchError(
-        e instanceof Error ? e.message : "Could not queue feedback update",
-      );
-    } finally {
-      setPatchingFeedbackId(null);
+  const visibleItems = useMemo(
+    () =>
+      unreviewedOnly
+        ? feedbackItems.filter((i) => !i.reviewed)
+        : feedbackItems,
+    [feedbackItems, unreviewedOnly],
+  );
+
+  useEffect(() => {
+    if (
+      feedbackExpandedId &&
+      !visibleItems.some((i) => i.id === feedbackExpandedId)
+    ) {
+      setFeedbackExpandedId(null);
     }
-  }
+  }, [feedbackExpandedId, visibleItems]);
 
   return (
     <section aria-label="Feedback" className="space-y-4 text-sm text-slate-700">
@@ -119,44 +102,57 @@ export function FeedbackSection({
           Feedback
         </p>
       ) : null}
-      <p className="text-xs text-slate-500">
-        For now, just copy feedback from below and use your{" "}
-        <a
-          href="https://gemini.google.com/app"
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
-        >
-          gemini
-        </a>{" "}
-        gem.
-      </p>
+
       {feedbackLoading && <p className="text-slate-500">Loading feedback…</p>}
       {feedbackError && <p className="text-red-600">{feedbackError}</p>}
-      {feedbackPatchError && (
-        <p className="text-red-600">{feedbackPatchError}</p>
-      )}
       {!feedbackLoading && !feedbackError && feedbackItems.length === 0 && (
         <p className="text-slate-500">No feedback yet.</p>
       )}
 
-      <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white/70">
-        {feedbackItems.map((item) => {
+      {!feedbackLoading && !feedbackError && feedbackItems.length > 0 ? (
+        <div className="mt-5">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={unreviewedOnly}
+              onChange={(e) => setUnreviewedOnly(e.target.checked)}
+              className="h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-950 focus:ring-slate-950"
+            />
+            Unreviewed only
+          </label>
+        </div>
+      ) : null}
+
+      <ul className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white/70">
+        {!feedbackLoading &&
+        !feedbackError &&
+        feedbackItems.length > 0 &&
+        visibleItems.length === 0 ? (
+          <li className="px-4 py-6 text-center text-slate-500">
+            No feedback matches this filter.
+          </li>
+        ) : null}
+        {visibleItems.map((item) => {
           const isExpanded = feedbackExpandedId === item.id;
           return (
             <li key={item.id}>
               <div className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-slate-50">
-                <p className="min-w-0 font-medium text-slate-900">
-                  {item.raw_input}
-                </p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 font-medium text-slate-900">
+                    {item.raw_input}
+                  </p>
+                  {item.reviewed ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                        aria-hidden
+                      />
+                      Reviewed
+                    </span>
+                  ) : null}
+                </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    href={`/writing/practice/${encodeURIComponent(item.id)}`}
-                    className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-slate-950 bg-slate-950 px-2.5 text-xs font-medium text-[#FDFCFB] transition-colors hover:border-slate-800 hover:bg-slate-800"
-                  >
-                    <span className="truncate">Practice</span>
-                  </Link>
                   <button
                     type="button"
                     onClick={() =>
@@ -215,38 +211,6 @@ export function FeedbackSection({
                     />
                     <span className="truncate">Copy</span>
                   </button>
-                  <button
-                    type="button"
-                    disabled={patchingFeedbackId === item.id}
-                    onClick={() =>
-                      submitFeedbackReviewed(
-                        item.id,
-                        !item.reviewed,
-                        item.focus_point,
-                      )
-                    }
-                    title={
-                      item.reviewed
-                        ? "Undo: mark as not practiced yet"
-                        : "Tap when you have practiced this feedback"
-                    }
-                    className={[
-                      "inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors disabled:opacity-50",
-                      item.reviewed
-                        ? "border-slate-900 bg-slate-900 text-[#FDFCFB] hover:bg-slate-800"
-                        : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
-                    ].join(" ")}
-                    aria-pressed={item.reviewed}
-                  >
-                    <BookCheck
-                      className="h-3.5 w-3.5 shrink-0"
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                    <span className="truncate">
-                      {item.reviewed ? "Practiced" : "Mark as practiced"}
-                    </span>
-                  </button>
                 </div>
 
                 {copiedId === item.id && (
@@ -281,6 +245,14 @@ export function FeedbackSection({
                         {item.focus_point}
                       </p>
                     )}
+                    <div className="pt-2">
+                      <Link
+                        href={`/writing/practice/${encodeURIComponent(item.id)}`}
+                        className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-3 text-center text-sm font-medium leading-snug text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                      >
+                        Start a review session with tutor
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>

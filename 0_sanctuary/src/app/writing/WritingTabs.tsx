@@ -1,7 +1,8 @@
 "use client";
 
 import { NotebookText, SquarePen } from "lucide-react";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { FreeWriterPanel } from "../_components/FreeWriterPanel";
 import { FeedbackSection } from "../vocab/FeedbackSection";
 
@@ -12,8 +13,39 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
-export function WritingTabs() {
-  const [activeTab, setActiveTab] = useState<TabId>("thoughts");
+function tabToSearchParam(id: TabId): string {
+  return id === "write-now" ? "writenow" : "thoughts";
+}
+
+function searchParamToTab(raw: string | null): TabId | null {
+  if (raw === "writenow") return "write-now";
+  if (raw === "thoughts") return "thoughts";
+  return null;
+}
+
+type WritingTabsProps = {
+  initialTab?: TabId;
+};
+
+export function WritingTabs({ initialTab }: WritingTabsProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<TabId>(
+    () => initialTab ?? "thoughts",
+  );
+
+  const selectTab = useCallback(
+    (id: TabId) => {
+      setActiveTab(id);
+      router.replace(`/writing?tab=${tabToSearchParam(id)}`, { scroll: false });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const t = searchParamToTab(searchParams.get("tab"));
+    if (t) setActiveTab(t);
+  }, [searchParams]);
 
   return (
     <>
@@ -29,7 +61,7 @@ export function WritingTabs() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={[
                   "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-2 transition-colors sm:gap-2 sm:px-3",
