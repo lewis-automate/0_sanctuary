@@ -1097,7 +1097,12 @@ export function UserSettingsClient({
           <button
             type="button"
             onClick={handleSaveAll}
-            disabled={saving}
+            disabled={saving || activeTab === "tone"}
+            title={
+              activeTab === "tone"
+                ? "Open Basic or Topics to save changes"
+                : undefined
+            }
             className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save all changes"}
