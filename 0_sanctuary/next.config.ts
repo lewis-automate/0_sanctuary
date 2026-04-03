@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   reactCompiler: true,
   // This tells Vercel: "I know what I'm doing, just build the app"
   typescript: {
@@ -15,6 +15,6 @@ const nextConfig: NextConfig = {
       { source: "/writer", destination: "/writing?tab=writenow", permanent: true },
     ];
   },
-};
+} as NextConfig;
 
 export default nextConfig;

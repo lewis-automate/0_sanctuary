@@ -50,7 +50,7 @@ function parseExplanationJson(raw: string): string {
     }
   }
 
-  const m = s.match(/"explanation"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/s);
+  const m = s.match(/"explanation"\s*:\s*"((?:[^"\\\\]|\\\\.)*)"/);
   if (m?.[1]) {
     try {
       return JSON.parse('"' + m[1] + '"') as string;

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimePostgresChangesPayload } from "@supabase/realtime-js";
 
 type Activity = {
   id: string;
@@ -82,7 +83,7 @@ export function CurrentActivities() {
             table: "activity_queue",
             filter: `user_id=eq.${user.id}`,
           },
-          (payload) => {
+          (payload: RealtimePostgresChangesPayload<Activity>) => {
             if (payload.eventType === "INSERT") {
               const row = payload.new as Activity;
               if (row.status !== "completed") {
@@ -113,9 +114,9 @@ export function CurrentActivities() {
         .select("id, event_type, status, created_at")
         .eq("user_id", user.id)
         .in("status", ["pending", "processing", "failed"])
-        .then(({ data }) => {
+        .then(({ data }: { data: Activity[] | null }) => {
           if (mounted && data?.length) {
-            setActivities(data as Activity[]);
+            setActivities(data);
           }
         });
     });
