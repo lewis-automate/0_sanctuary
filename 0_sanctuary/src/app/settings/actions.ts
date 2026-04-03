@@ -21,10 +21,19 @@ export type UpsertTopic = {
   active: boolean;
 };
 
+/** Optional hint for n8n / workers (mirrored in activity_queue.payload). */
+export type UserSettingsSaveTrigger =
+  | "theme_toggle"
+  | "save_basic"
+  | "save_topics"
+  | "save_tone"
+  | "save_all";
+
 export type UserSettingsSavePayload = {
   user_settings: UserSettingsProfile;
   upsert_topics: UpsertTopic[];
   deleted_ids: (number | string)[];
+  settings_trigger?: UserSettingsSaveTrigger;
 };
 
 export async function queueUserSettings(
@@ -62,6 +71,9 @@ export async function queueUserSettings(
     return { ok: true };
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
   try {
     const res = await fetch(n8nUrl, {
       method: "POST",
@@ -70,13 +82,17 @@ export async function queueUserSettings(
         job_id: row.id,
         user_id: user.id,
         event_type: "user_settings",
+        payload,
         ...payload,
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       return { ok: false, error: `Webhook returned ${res.status}` };
     }
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error("[queueUserSettings] n8n webhook error:", err);
     // Settings are already queued, treat as success
   }

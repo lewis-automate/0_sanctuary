@@ -1,9 +1,9 @@
 "use client";
 
-import { Bookmark, ListChecks, Plus } from "lucide-react";
+import { Bookmark, ChevronDown, ListChecks, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import {
   SubNavTabBar,
@@ -12,6 +12,11 @@ import {
 import { AddVocabScreen } from "./AddVocabScreen";
 import { RapidReviewSession } from "./RapidReviewSession";
 import { queueStudyItemArchive } from "./study-queue-actions";
+import {
+  formatMasteryScore,
+  sortSavedStudyItems,
+  type SavedStudySortKey as SavedSortKey,
+} from "./saved-sort";
 
 type StudyItem = {
   id: string;
@@ -20,7 +25,23 @@ type StudyItem = {
   definition: string | null;
   translation: string | null;
   archived: boolean | null;
+  date_added: string | null;
+  last_used: string | null;
+  mastery_score: unknown;
 };
+
+const SAVED_SORT_LABELS: Record<SavedSortKey, string> = {
+  /** Label for `study_items.last_used` (updated when you rate in rapid review). */
+  last_used: "Last reviewed",
+  created: "Created",
+  mastery_score: "Mastery score",
+};
+
+const SAVED_SORT_KEYS: SavedSortKey[] = [
+  "last_used",
+  "created",
+  "mastery_score",
+];
 
 const vocabTabs = [
   { id: "saved" as const, Icon: Bookmark, label: "Saved" },
@@ -83,10 +104,21 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
   const [archiveActionError, setArchiveActionError] = useState<string | null>(
     null,
   );
+  const [savedSortKey, setSavedSortKey] = useState<SavedSortKey>("created");
+  const [savedSortDirection, setSavedSortDirection] = useState<"asc" | "desc">(
+    "desc",
+  );
 
-  const visibleSavedItems = showArchived
-    ? items
-    : items.filter((i) => i.archived !== true);
+  const filteredSavedItems = useMemo(
+    () => (showArchived ? items : items.filter((i) => i.archived !== true)),
+    [items, showArchived],
+  );
+
+  const displaySavedItems = useMemo(
+    () =>
+      sortSavedStudyItems(filteredSavedItems, savedSortKey, savedSortDirection),
+    [filteredSavedItems, savedSortKey, savedSortDirection],
+  );
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -254,6 +286,38 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
               </button>
             </div>
 
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-2">
+              {SAVED_SORT_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    if (key === savedSortKey) {
+                      setSavedSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSavedSortKey(key);
+                      setSavedSortDirection("desc");
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                    key === savedSortKey
+                      ? "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                      : "border-[var(--border-default)] bg-[var(--field-bg)] text-[var(--field-text)] hover:border-[var(--border-strong)]"
+                  }`}
+                >
+                  <span>{SAVED_SORT_LABELS[key]}</span>
+                  {key === savedSortKey ? (
+                    <span
+                      className="ml-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--nav-active-fg)]/18 text-base font-bold leading-none text-[var(--nav-active-fg)]"
+                      aria-hidden
+                    >
+                      {savedSortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+
             <div className="mt-2">
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
                 <input
@@ -282,96 +346,123 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
             {!loading &&
               !error &&
               items.length > 0 &&
-              visibleSavedItems.length === 0 && (
+              displaySavedItems.length === 0 && (
                 <p className="text-[var(--text-muted)]">
                   No words to show. Enable &quot;Show archived&quot; to see archived items.
                 </p>
               )}
 
             <ul className="divide-y divide-[var(--border-default)] rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)]">
-              {visibleSavedItems.map((item) => {
+              {displaySavedItems.map((item) => {
                 const isExpanded = expandedId === item.id;
                 const archived = item.archived === true;
                 const archiveBusy = archiveBusyId === item.id;
                 return (
                   <li key={item.id} className="flex flex-col">
-                    <div className="space-y-2 px-4 py-3 hover:bg-[var(--nav-hover-bg)]">
-                      {/* Grid: second column is always sized for Archive + Show (flex alone can still clip it). */}
-                      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                          className="flex min-w-0 text-left"
-                        >
-                          <span className="flex min-w-0 items-baseline gap-1.5">
-                            <span className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                              {item.vocab}
-                            </span>
-                            {archived ? (
-                              <span className="shrink-0 text-xs font-normal text-[var(--text-muted)]">
-                                (archived)
-                              </span>
-                            ) : null}
-                          </span>
-                        </button>
-                        <div className="relative z-[1] flex flex-nowrap items-center gap-2 border-l border-[var(--border-default)] pl-2">
-                          <label
-                            className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium leading-none text-[var(--foreground)] ${archiveBusy ? "pointer-events-none opacity-60" : ""}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={archived}
-                              disabled={archiveBusy}
-                              onChange={(e) => {
-                                void setItemArchived(item.id, e.target.checked);
-                              }}
-                              className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-2 focus:ring-[var(--nav-active-bg)] focus:ring-offset-1 focus:ring-offset-[var(--surface-panel)] disabled:opacity-60"
-                              title={archived ? "Unarchive" : "Archive"}
-                            />
-                            <span>Archive</span>
-                          </label>
+                    <div
+                      className={[
+                        "flex flex-col transition-colors",
+                        isExpanded
+                          ? "bg-[var(--nav-hover-bg)]"
+                          : "hover:bg-[var(--nav-hover-bg)]",
+                      ].join(" ")}
+                    >
+                      <div className="space-y-2 px-4 pt-3">
+                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
                           <button
                             type="button"
-                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                            className="shrink-0 text-xs font-medium text-[var(--field-placeholder)] hover:text-[var(--foreground)]"
+                            onClick={() =>
+                              setExpandedId(isExpanded ? null : item.id)
+                            }
+                            className="flex min-w-0 text-left"
                           >
-                            {isExpanded ? "Hide" : "Show"}
+                            <span className="flex min-w-0 items-baseline gap-1.5">
+                              <span className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                                {item.vocab}
+                              </span>
+                              {archived ? (
+                                <span className="shrink-0 text-xs font-normal text-[var(--text-muted)]">
+                                  (archived)
+                                </span>
+                              ) : null}
+                            </span>
                           </button>
+                          <div className="relative z-[1] flex max-w-[11rem] flex-col gap-1 border-l border-[var(--border-default)] pl-2">
+                            <label
+                              className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium leading-none text-[var(--foreground)] ${archiveBusy ? "pointer-events-none opacity-60" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={archived}
+                                disabled={archiveBusy}
+                                onChange={(e) => {
+                                  void setItemArchived(item.id, e.target.checked);
+                                }}
+                                className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-2 focus:ring-[var(--nav-active-bg)] focus:ring-offset-1 focus:ring-offset-[var(--surface-panel)] disabled:opacity-60"
+                                title={archived ? "Unarchive" : "Archive"}
+                              />
+                              <span>Archive</span>
+                            </label>
+                            <p className="text-[0.65rem] leading-tight text-[var(--text-muted)]">
+                              Mastery{" "}
+                              <span className="tabular-nums font-semibold text-[var(--foreground)]">
+                                {formatMasteryScore(item.mastery_score)}
+                              </span>
+                            </p>
+                          </div>
                         </div>
+                        {item.example_sentences ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedId(isExpanded ? null : item.id)
+                            }
+                            className="w-full text-left"
+                          >
+                            <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
+                              {item.example_sentences}
+                            </p>
+                          </button>
+                        ) : null}
                       </div>
-                      {item.example_sentences ? (
-                        <button
-                          type="button"
-                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                          className="w-full text-left"
-                        >
-                          <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
-                            {item.example_sentences}
-                          </p>
-                        </button>
-                      ) : null}
-                    </div>
 
-                    {isExpanded ? (
-                      <div className="space-y-1 border-t border-[var(--border-default)] px-4 pb-3 pt-2 text-xs text-[var(--text-muted)]">
-                        {item.definition && (
-                          <p>
-                            <span className="font-semibold text-[var(--foreground)]">
-                              Definition:
-                            </span>{" "}
-                            {item.definition}
-                          </p>
-                        )}
-                        {item.translation && (
-                          <p>
-                            <span className="font-semibold text-[var(--foreground)]">
-                              Translation:
-                            </span>{" "}
-                            {item.translation}
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
+                      {isExpanded ? (
+                        <div className="space-y-1 border-t border-[var(--border-default)] px-4 pb-2 pt-2 text-xs text-[var(--text-muted)]">
+                          {item.definition && (
+                            <p>
+                              <span className="font-semibold text-[var(--foreground)]">
+                                Definition:
+                              </span>{" "}
+                              {item.definition}
+                            </p>
+                          )}
+                          {item.translation && (
+                            <p>
+                              <span className="font-semibold text-[var(--foreground)]">
+                                Translation:
+                              </span>{" "}
+                              {item.translation}
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? "Collapse details" : "Expand details"}
+                        onClick={() =>
+                          setExpandedId(isExpanded ? null : item.id)
+                        }
+                        className="flex w-full items-center justify-center py-2 text-[var(--field-placeholder)] transition-colors hover:text-[var(--foreground)]"
+                      >
+                        <ChevronDown
+                          strokeWidth={2}
+                          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      </button>
+                    </div>
                   </li>
                 );
               })}

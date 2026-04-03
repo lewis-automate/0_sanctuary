@@ -7,7 +7,7 @@ import { getSupabase } from "@/lib/supabase";
 /**
  * Handles the redirect from Supabase after the user clicks the password-reset
  * link in their email. The URL contains tokens in the hash (e.g. #access_token=...&refresh_token=...&type=recovery).
- * We set the session from the hash, then redirect to the password update page.
+ * We set the session from the hash, then redirect to Settings (Password tab).
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function AuthCallbackPage() {
           return;
         }
         setStatus("ok");
-        router.replace("/settings/password");
+        router.replace("/settings?tab=password");
         router.refresh();
         return;
       }
@@ -39,7 +39,7 @@ export default function AuthCallbackPage() {
       // No recovery tokens: maybe already have a session (e.g. opened link twice)
       const { data: { session } } = await getSupabase().auth.getSession();
       if (session) {
-        router.replace("/settings/password");
+        router.replace("/settings?tab=password");
         router.refresh();
         return;
       }

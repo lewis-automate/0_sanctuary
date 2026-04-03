@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 
-export function LogoutButton() {
+/** Optional compact variant for inline toolbars. */
+const pillClass =
+  "rounded-full border border-transparent bg-transparent px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-[var(--foreground)]";
+
+type Props = {
+  /** Full-width row card (default) or compact pill for settings sub-nav */
+  variant?: "card" | "pill";
+};
+
+export function LogoutButton({ variant = "card" }: Props) {
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -21,12 +30,22 @@ export function LogoutButton() {
         type="button"
         data-settings-logout
         onClick={() => setShowConfirm(true)}
-        className="flex w-full items-center justify-between rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] px-5 py-4 text-left transition-colors hover:bg-[var(--surface-elevated)]"
+        className={
+          variant === "pill"
+            ? pillClass
+            : "flex w-full items-center justify-between rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] px-5 py-4 text-left transition-colors hover:bg-[var(--surface-elevated)]"
+        }
       >
-        <span className="text-base font-medium text-[var(--foreground)]">
-          Log out
-        </span>
-        <span className="text-sm text-[var(--text-muted)]">›</span>
+        {variant === "pill" ? (
+          "Log out"
+        ) : (
+          <>
+            <span className="text-base font-medium text-[var(--foreground)]">
+              Log out
+            </span>
+            <span className="text-sm text-[var(--text-muted)]">›</span>
+          </>
+        )}
       </button>
 
       {showConfirm && (

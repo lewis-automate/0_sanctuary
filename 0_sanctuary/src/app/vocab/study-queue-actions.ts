@@ -97,17 +97,28 @@ export async function queueRapidReviewComplete(
 }
 
 export type StudyItemArchivePayload = {
-  study_item_id: string;
+  /** DB may expose this as string (uuid) or number depending on column type. */
+  study_item_id: string | number;
   archived: boolean;
 };
+
+function normalizeStudyItemId(raw: unknown): string {
+  if (typeof raw === "string") {
+    return raw.trim();
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(Math.trunc(raw));
+  }
+  if (typeof raw === "bigint") {
+    return String(raw);
+  }
+  return "";
+}
 
 export async function queueStudyItemArchive(
   payload: StudyItemArchivePayload,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const study_item_id =
-    typeof payload.study_item_id === "string"
-      ? payload.study_item_id.trim()
-      : "";
+  const study_item_id = normalizeStudyItemId(payload.study_item_id);
   if (!study_item_id) {
     return { ok: false, error: "Missing study item" };
   }

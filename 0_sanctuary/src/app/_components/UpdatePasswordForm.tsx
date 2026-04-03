@@ -33,7 +33,9 @@ export function UpdatePasswordForm() {
       return;
     }
 
-    router.push("/settings?message=Password+updated+successfully");
+    router.push(
+      "/settings?tab=password&message=Password+updated+successfully",
+    );
     router.refresh();
   };
 

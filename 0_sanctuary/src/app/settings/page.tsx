@@ -1,9 +1,8 @@
 import { randomUUID } from "crypto";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Suspense } from "react";
 import { FadeIn } from "../_components/FadeIn";
-import { LogoutButton } from "../_components/LogoutButton";
 import type { UserSettingsProfile } from "./actions";
+import { parseSettingsTab } from "./settings-tabs";
 import { UserSettingsClient } from "./UserSettingsClient";
 import { normalizeAppTheme } from "@/lib/app-theme";
 import { createClient } from "@/lib/supabase/server";
@@ -11,7 +10,9 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams?: Promise<{ message?: string }> | { message?: string };
+  searchParams?:
+    | Promise<{ message?: string; tab?: string }>
+    | { message?: string; tab?: string };
 };
 
 function coerceVocabChunkingToBoolean(
@@ -91,6 +92,9 @@ export default async function SettingsPage({ searchParams }: PageProps) {
   const params =
     searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const message = params.message;
+  const initialTab = parseSettingsTab(
+    typeof params.tab === "string" ? params.tab : null,
+  );
   const clientMountKey = randomUUID();
 
   const supabase = await createClient();
@@ -180,51 +184,75 @@ export default async function SettingsPage({ searchParams }: PageProps) {
       active: !!t.active,
     })) ?? [];
 
+  type UsageCount = { key: string; count: number };
+
+  function countsFromPromptField(
+    rows: Record<string, unknown>[] | null,
+    field: "prompt_topic" | "prompt_tone",
+  ): UsageCount[] {
+    if (!rows?.length) return [];
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      const raw = row[field];
+      const trimmed = typeof raw === "string" ? raw.trim() : "";
+      const key = trimmed.length > 0 ? trimmed : "blank";
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  let storyGenTopicUsage: UsageCount[] = [];
+  let storyGenToneUsage: UsageCount[] = [];
+
+  if (user) {
+    const storiesRes = await supabase
+      .from("stories")
+      .select("prompt_topic, prompt_tone")
+      .eq("original_author_id", user.id);
+
+    if (storiesRes.error) {
+      console.error(
+        "[Settings] stories prompt_topic / prompt_tone error:",
+        storiesRes.error.message,
+      );
+    } else if (storiesRes.data) {
+      storyGenTopicUsage = countsFromPromptField(
+        storiesRes.data as Record<string, unknown>[],
+        "prompt_topic",
+      );
+      storyGenToneUsage = countsFromPromptField(
+        storiesRes.data as Record<string, unknown>[],
+        "prompt_tone",
+      );
+    }
+  }
+
+  const settingsMessage =
+    typeof message === "string" && message.length > 0
+      ? decodeURIComponent(message.replace(/\+/g, " "))
+      : null;
+
   return (
-    <FadeIn className="mx-auto w-full max-w-prose">
-      <header className="mb-4">
-        <div className="flex items-start gap-3 sm:items-center">
-          <Link
-            href="/"
-            className="mt-0.5 inline-flex shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 sm:mt-0"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
-          </Link>
-          <div className="min-w-0 flex-1 text-center sm:text-left">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Settings
-            </p>
-            {message && (
-              <p className="mt-2 text-sm text-[var(--prose-text)]">
-                {decodeURIComponent(message.replace(/\+/g, " "))}
-              </p>
-            )}
+    <FadeIn className="mx-auto w-full max-w-3xl">
+      <Suspense
+        fallback={
+          <div className="py-10 text-center text-sm text-[var(--text-muted)]">
+            Loading settings…
           </div>
-        </div>
-      </header>
-
-      <div className="mb-5 flex gap-2 text-sm font-medium text-[var(--text-muted)]">
-        <span className="rounded-full border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-3 py-1 text-xs text-[var(--nav-active-fg)]">
-          User Settings
-        </span>
-        <Link
-          href="/settings/password"
-          className="rounded-full bg-transparent px-3 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--foreground)]"
-        >
-          Password
-        </Link>
-      </div>
-
-      <UserSettingsClient
-        key={user ? `${user.id}-${clientMountKey}` : "guest"}
-        initialUser={initialUser}
-        initialTopics={initialTopics}
-      />
-
-      <div className="mt-6 space-y-3">
-        <LogoutButton />
-      </div>
+        }
+      >
+        <UserSettingsClient
+          key={user ? `${user.id}-${clientMountKey}` : "guest"}
+          initialUser={initialUser}
+          initialTopics={initialTopics}
+          initialTab={initialTab}
+          storyGenTopicUsage={storyGenTopicUsage}
+          storyGenToneUsage={storyGenToneUsage}
+          settingsMessage={settingsMessage}
+        />
+      </Suspense>
     </FadeIn>
   );
 }

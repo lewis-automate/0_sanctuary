@@ -16,15 +16,19 @@ export async function GET() {
   const { data, error } = await supabase
     .from("study_items")
     .select(
-      "id, vocab, example_sentences, definition, translation, date_added, archived",
+      "id, vocab, example_sentences, definition, translation, date_added, archived, last_used, mastery_score",
     )
-    .eq("user_id", user.id)
-    .order("date_added", { ascending: false });
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ items: data ?? [] });
+  const items = (data ?? []).map((row) => ({
+    ...row,
+    id: row.id == null ? "" : String(row.id),
+  }));
+
+  return NextResponse.json({ items });
 }
 
