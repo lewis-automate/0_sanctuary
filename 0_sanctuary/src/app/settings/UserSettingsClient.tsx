@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toHtmlDatasetValue } from "@/lib/app-theme";
 import { getSupabase } from "@/lib/supabase";
 import type {
   UserSettingsProfile,
@@ -17,14 +18,17 @@ import type {
 import { queueUserSettings } from "./actions";
 
 const DIFFICULTY_OPTIONS = [
+  "A1",
+  "A1/A2",
   "A2",
   "A2/B1",
   "B1",
   "B1/B2",
   "B2",
   "B2/C1",
-  "C1",
 ] as const;
+
+const APP_THEME_OPTIONS = ["Light", "Dark"] as const;
 
 type ExistingTopic = {
   id: number | string;
@@ -114,6 +118,12 @@ export function UserSettingsClient({
 
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
+
+  useEffect(() => {
+    document.documentElement.dataset.appTheme = toHtmlDatasetValue(
+      user.app_theme,
+    );
+  }, [user.app_theme]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -318,31 +328,31 @@ export function UserSettingsClient({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-4">
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Profile</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Profile</h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           Update your core reading preferences and language profile.
         </p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Username
             </label>
             <input
               type="text"
               value={user.username}
               onChange={(e) => handleUserChange("username", e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="Your username"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-xs font-medium text-slate-700">
+            <label className="block text-xs font-medium text-[var(--prose-text)]">
               Vocab chunking (This is always on. It cannot yet be disabled despite visual indication)
             </label>
-            <div className="mt-2 inline-flex rounded-full bg-slate-100 p-0.5 text-xs text-slate-600">
+            <div className="mt-2 inline-flex rounded-full bg-[var(--surface-elevated)] p-0.5 text-xs text-[var(--text-muted)]">
               {([true, false] as const).map((value) => {
                 const isActive = user.vocab_chunking === value;
                 return (
@@ -352,8 +362,8 @@ export function UserSettingsClient({
                     onClick={() => handleUserChange("vocab_chunking", value)}
                     className={`px-3 py-1 rounded-full transition-colors ${
                       isActive
-                        ? "bg-slate-900 text-[#FDFCFB]"
-                        : "bg-transparent text-slate-700 hover:text-slate-900"
+                        ? "bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                        : "bg-transparent text-[var(--foreground)] hover:opacity-90"
                     }`}
                   >
                     {value ? "On" : "Off"}
@@ -363,8 +373,43 @@ export function UserSettingsClient({
             </div>
           </div>
 
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
+              Appearance
+            </label>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+              App background and navigation colors. Saves with your profile.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+              {APP_THEME_OPTIONS.map((theme) => {
+                const isSelected = user.app_theme === theme;
+                return (
+                  <button
+                    key={theme}
+                    type="button"
+                    onClick={() => handleUserChange("app_theme", theme)}
+                    className={`flex items-center justify-start gap-2 rounded-2xl border px-3 py-2 transition-colors ${
+                      isSelected
+                        ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                        : "border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--field-text)] hover:border-[var(--border-strong)]"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 rounded-full border ${
+                        isSelected
+                          ? "border-[var(--nav-active-fg)] bg-[var(--nav-active-fg)]"
+                          : "border-[var(--border-strong)]"
+                      }`}
+                    />
+                    <span>{theme}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Native language
             </label>
             <input
@@ -373,13 +418,13 @@ export function UserSettingsClient({
               onChange={(e) =>
                 handleUserChange("native_language", e.target.value)
               }
-              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="e.g. English"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Target language
             </label>
             <input
@@ -388,13 +433,13 @@ export function UserSettingsClient({
               onChange={(e) =>
                 handleUserChange("target_language", e.target.value)
               }
-              className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+              className="w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="e.g. Spanish"
             />
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Tone or personality for the writer
             </label>
             <div className="relative mt-2">
@@ -405,20 +450,20 @@ export function UserSettingsClient({
                 onChange={(e) =>
                   handleUserChange("preferred_tone", e.target.value)
                 }
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-3 pb-8 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                className="w-full resize-none rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-3 pb-8 text-sm leading-relaxed text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
                 placeholder="Example: The omniscient narrator. Kind, wise, and insightful. Write like it's the winner for a teen literature contest."
               />
-              <span className="absolute bottom-3 right-3 text-xs text-slate-400">
+              <span className="absolute bottom-3 right-3 text-xs text-[var(--field-placeholder)]">
                 {user.preferred_tone.length}/200
               </span>
             </div>
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Difficulty
             </label>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               Recommended: Start slightly below your current level.
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
@@ -436,15 +481,15 @@ export function UserSettingsClient({
                     }
                     className={`flex items-center justify-start gap-2 rounded-2xl border px-3 py-2 transition-colors ${
                       isSelected
-                        ? "border-slate-900 bg-slate-900 text-[#FDFCFB]"
-                        : "border-slate-200 bg-white text-slate-700 hover:bg-white"
+                        ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                        : "border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--field-text)] hover:border-[var(--border-strong)]"
                     }`}
                   >
                     <span
                       className={`inline-block h-3 w-3 rounded-full border ${
                         isSelected
-                          ? "border-[#FDFCFB] bg-[#FDFCFB]"
-                          : "border-slate-300"
+                          ? "border-[var(--nav-active-fg)] bg-[var(--nav-active-fg)]"
+                          : "border-[var(--border-strong)]"
                       }`}
                     />
                     <span>{label}</span>
@@ -455,10 +500,10 @@ export function UserSettingsClient({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-700">
+            <label className="text-xs font-medium text-[var(--prose-text)]">
               Target word-count
             </label>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               Recommended: 400-800
             </p>
             <input
@@ -478,7 +523,7 @@ export function UserSettingsClient({
                   n > 2500 ? 2500 : n,
                 );
               }}
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+              className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="e.g. 400 (max 2500)"
             />
           </div>
@@ -487,14 +532,14 @@ export function UserSettingsClient({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
+      <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm">
         <h2
           id="topic-memory-section-title"
-          className="text-base font-semibold text-slate-900"
+          className="text-base font-semibold text-[var(--foreground)]"
         >
           Topic Memory
         </h2>
-        <p className="mt-1 text-xs text-slate-500">The amount of articles/stories the system will look back to ensure a new topic. This is topic-specific, so if you want a unique reading material each time, it is advised to select varying topics.</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">The amount of articles/stories the system will look back to ensure a new topic. This is topic-specific, so if you want a unique reading material each time, it is advised to select varying topics.</p>
         <input
           id="last_stories_filter"
           name="last_stories_filter"
@@ -516,18 +561,18 @@ export function UserSettingsClient({
             );
           }}
           aria-labelledby="topic-memory-section-title"
-          className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+          className="mt-4 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
           placeholder="0–99"
         />
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Topics</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Topics</h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           Curate the themes and areas you want stories about.
         </p>
 
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-slate-50/80 p-3 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-[var(--surface-elevated)] p-3 sm:flex-row">
           <input
             type="text"
             value={newTopicName}
@@ -538,13 +583,13 @@ export function UserSettingsClient({
                 handleAddTopic();
               }
             }}
-            className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+            className="flex-1 rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
             placeholder="Add a new topic (e.g. history, travel, science)…"
           />
           <button
             type="button"
             onClick={handleAddTopic}
-            className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:opacity-50"
             disabled={!newTopicName.trim()}
           >
             Add
@@ -553,7 +598,7 @@ export function UserSettingsClient({
 
         <ul className="mt-4 space-y-2">
           {allTopicsForDisplay.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            <li className="rounded-2xl border border-dashed border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2 text-xs text-[var(--text-muted)]">
               No topics yet. Add a few to guide story prompts.
             </li>
           )}
@@ -561,12 +606,12 @@ export function UserSettingsClient({
           {allTopicsForDisplay.map((topic) => (
             <li
               key={topic.key}
-              className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 sm:flex-row sm:items-start sm:gap-3"
+              className="flex flex-col gap-2 rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] sm:flex-row sm:items-start sm:gap-3"
             >
               {topic.isExisting ? (
-                <p className="w-full min-w-0 rounded-xl border border-slate-100 bg-slate-50/90 px-2 py-1.5 text-sm text-slate-900 sm:flex-1">
+                <p className="w-full min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1.5 text-sm text-[var(--foreground)] sm:flex-1">
                   {topic.topic_name || (
-                    <span className="text-slate-400">(empty)</span>
+                    <span className="text-[var(--field-placeholder)]">(empty)</span>
                   )}
                 </p>
               ) : (
@@ -576,17 +621,17 @@ export function UserSettingsClient({
                   onChange={(e) =>
                     handleNewTopicNameChange(topic.key, e.target.value)
                   }
-                  className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none sm:flex-1"
+                  className="w-full min-w-0 rounded-xl border border-[var(--field-border)] bg-[var(--surface-panel-solid)] px-2 py-1 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0 sm:flex-1"
                 />
               )}
 
               <div className="flex shrink-0 flex-wrap items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                   <input
                     type="checkbox"
                     checked={topic.active}
                     onChange={() => handleTopicToggle(topic.key)}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-0"
+                    className="h-3.5 w-3.5 rounded border-[var(--border-strong)] text-[var(--nav-active-bg)] accent-[var(--nav-active-bg)] focus:ring-0"
                   />
                   <span>Active</span>
                 </label>
@@ -594,7 +639,7 @@ export function UserSettingsClient({
                 <button
                   type="button"
                   onClick={() => setTopicPendingDeleteKey(topic.key)}
-                  className="rounded-full border border-red-100 px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:border-red-200 hover:bg-red-50"
+                  className="rounded-full border border-[var(--semantic-danger-soft-border)] px-3 py-1 text-xs font-medium text-[var(--semantic-danger-inline)] transition-colors hover:border-[var(--semantic-danger-border)] hover:bg-[var(--semantic-danger-hover)]"
                 >
                   Delete
                 </button>
@@ -606,16 +651,18 @@ export function UserSettingsClient({
 
       <section className="mt-2 flex items-center justify-between gap-3">
         <div className="min-h-[1.5rem] text-xs">
-          {saveError && <span className="text-red-600">{saveError}</span>}
+          {saveError && <span className="text-[var(--semantic-danger-inline)]">{saveError}</span>}
           {saveSuccess && !saveError && (
-            <span className="text-emerald-600">Settings saved.</span>
+            <span className="text-[var(--semantic-success-inline)]">
+              Settings saved.
+            </span>
           )}
         </div>
         <button
           type="button"
           onClick={handleSaveAll}
           disabled={saving}
-          className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-[#FDFCFB] shadow-sm transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save all changes"}
         </button>
@@ -648,11 +695,11 @@ export function UserSettingsClient({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="unsaved-changes-title"
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl"
+                className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-xl"
               >
                 <p
                   id="unsaved-changes-title"
-                  className="text-center text-sm text-slate-700"
+                  className="text-center text-sm text-[var(--prose-text)]"
                 >
                   You have unsaved changes. Leave this page without saving?
                 </p>
@@ -660,14 +707,14 @@ export function UserSettingsClient({
                   <button
                     type="button"
                     onClick={() => setPendingLeave(null)}
-                    className="flex-1 rounded-2xl border border-slate-200 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
                   >
                     Stay on page
                   </button>
                   <button
                     type="button"
                     onClick={() => pendingLeave && tryLeave(pendingLeave)}
-                    className="flex-1 rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                    className="flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90"
                   >
                     {pendingLeave?.kind === "logout"
                       ? "Leave without saving"
@@ -706,11 +753,11 @@ export function UserSettingsClient({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="delete-topic-title"
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl"
+                className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-xl"
               >
                 <p
                   id="delete-topic-title"
-                  className="text-center text-sm text-slate-700"
+                  className="text-center text-sm text-[var(--prose-text)]"
                 >
                   Are you sure you want to delete a topic?
                 </p>
@@ -718,7 +765,7 @@ export function UserSettingsClient({
                   <button
                     type="button"
                     onClick={() => setTopicPendingDeleteKey(null)}
-                    className="flex-1 rounded-2xl border border-slate-200 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
                   >
                     Cancel
                   </button>

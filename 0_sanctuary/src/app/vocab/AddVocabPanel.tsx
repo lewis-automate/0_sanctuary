@@ -38,8 +38,8 @@ function VocabLineField({
   return (
     <div
       className={[
-        "flex min-h-[2.75rem] items-stretch overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm",
-        "focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-950/10",
+        "flex min-h-[2.75rem] items-stretch overflow-hidden rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] shadow-sm",
+        "focus-within:border-[var(--border-strong)] focus-within:ring-2 focus-within:ring-[var(--foreground)]/10",
       ].join(" ")}
     >
       <div className="relative min-w-0 flex-1">
@@ -57,23 +57,23 @@ function VocabLineField({
           rows={1}
           maxLength={MAX_CHARS_PER_FIELD}
           aria-describedby={counterId}
-          className="w-full min-h-[2.75rem] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-4 py-3 pb-9 pr-12 text-sm leading-relaxed text-slate-900 shadow-none placeholder:text-slate-400 focus:outline-none focus:ring-0"
+          className="w-full min-h-[2.75rem] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-4 py-3 pb-9 pr-12 text-sm leading-relaxed text-[var(--field-text)] shadow-none placeholder:text-[var(--field-placeholder)] focus:outline-none focus:ring-0"
           autoComplete="off"
         />
         <span
           id={counterId}
-          className="pointer-events-none absolute bottom-2 right-3 text-xs tabular-nums text-slate-500"
+          className="pointer-events-none absolute bottom-2 right-3 text-xs tabular-nums text-[var(--field-placeholder)]"
           aria-live="polite"
         >
           {value.length} / {MAX_CHARS_PER_FIELD}
         </span>
       </div>
       {onRemove ? (
-        <div className="flex w-11 shrink-0 flex-col border-l border-slate-200 bg-white/90">
+        <div className="flex w-11 shrink-0 flex-col border-l border-[var(--field-border)] bg-[var(--field-bg)]">
           <button
             type="button"
             onClick={onRemove}
-            className="flex min-h-[2.75rem] flex-1 items-center justify-center text-xl font-medium leading-none text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+            className="flex min-h-[2.75rem] flex-1 items-center justify-center text-xl font-medium leading-none text-[var(--semantic-danger-inline)] transition-colors hover:bg-[var(--semantic-danger-hover)] hover:text-[var(--semantic-danger-title)]"
             aria-label={`Remove field ${lineIndex + 1}`}
           >
             ×
@@ -165,17 +165,17 @@ export function AddVocabPanel() {
   }
 
   const btnSecondary =
-    "rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-white";
+    "rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-4 py-2.5 text-sm font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]";
 
   const btnPrimary =
-    "rounded-2xl border border-slate-950 bg-slate-950 px-4 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800";
+    "rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90";
 
   return (
     <>
-      <section className="rounded-3xl border border-slate-200 bg-white/80 p-5 sm:p-6">
+      <section className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-5 sm:p-6">
         {saveConfirmed ? (
           <div
-            className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-900"
+            className="mb-4 rounded-2xl border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-4 py-3 text-sm leading-relaxed text-[var(--semantic-success-text)]"
             role="status"
             aria-live="polite"
           >
@@ -211,7 +211,7 @@ export function AddVocabPanel() {
             className={[
               "inline-flex h-10 min-w-10 items-center justify-center px-3 font-semibold rounded-2xl border text-sm transition-colors",
               atRowLimit
-                ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)]"
                 : `${btnSecondary}`,
             ].join(" ")}
             aria-label="Add another field"
@@ -237,7 +237,7 @@ export function AddVocabPanel() {
           </button>
         </div>
         {atRowLimit ? (
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-[var(--text-muted)]">
             Maximum {MAX_VOCAB_ROWS} entries at a time. Save or remove a row to
             add more later.
           </p>
@@ -251,7 +251,7 @@ export function AddVocabPanel() {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/40 disabled:cursor-not-allowed"
+            className="absolute inset-0 bg-black/45 disabled:cursor-not-allowed"
             aria-label="Close dialog"
             disabled={saveBusy}
             onClick={() => !saveBusy && setSaveDialogOpen(false)}
@@ -260,16 +260,19 @@ export function AddVocabPanel() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-[#FDFCFB] p-6 shadow-lg"
+            className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-lg"
           >
-            <h2 id={titleId} className="text-base font-semibold text-slate-900">
+            <h2
+              id={titleId}
+              className="text-base font-semibold text-[var(--foreground)]"
+            >
               Save these words?
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
               Do you want to save the words you&apos;ve written? {wordLabel}
             </p>
             {saveError ? (
-              <p className="mt-3 text-sm text-red-600" role="alert">
+              <p className="mt-3 text-sm text-[var(--semantic-danger-inline)]" role="alert">
                 {saveError}
               </p>
             ) : null}

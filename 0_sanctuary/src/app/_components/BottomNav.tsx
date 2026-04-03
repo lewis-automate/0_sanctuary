@@ -31,7 +31,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Bottom navigation"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-[#fbf5ef]/90 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[var(--surface-panel)] backdrop-blur"
     >
       <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
         {tabs.map(({ href, label, Icon }) => {
@@ -44,16 +44,16 @@ export function BottomNav() {
               className={[
                 "group flex w-24 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 transition-colors",
                 isActive
-                  ? "bg-slate-950 text-[#FDFCFB]"
-                  : "text-slate-700 hover:bg-slate-900/5 hover:text-slate-900",
+                  ? "bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                  : "text-[var(--nav-idle-text)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--foreground)]",
               ].join(" ")}
             >
               <Icon
                 className={[
                   "h-5 w-5",
                   isActive
-                    ? "text-[#FDFCFB]"
-                    : "text-slate-700 group-hover:text-slate-900",
+                    ? "text-[var(--nav-active-fg)]"
+                    : "text-[var(--nav-idle-text)] group-hover:text-[var(--foreground)]",
                 ].join(" ")}
               />
               <span className="text-xs font-medium tracking-wide">

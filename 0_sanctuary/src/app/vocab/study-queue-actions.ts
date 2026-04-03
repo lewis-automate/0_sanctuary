@@ -2,14 +2,6 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export type HyperFocusCompletePayload = {
-  study_item_id: string;
-  vocab: string;
-  explanation: string;
-  dissected: string;
-  sentences: { sentence: string; reference: string }[];
-};
-
 export type RapidReviewRatingRow = {
   study_item_id: string;
   vocab: string;
@@ -92,49 +84,6 @@ async function enqueueStudyActivity(
   }
 }
 
-function coerceMastery(raw: unknown): number {
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (typeof raw === "string" && Number.isFinite(parseFloat(raw)))
-    return parseFloat(raw);
-  return 0;
-}
-
-function coerceTimesUsed(raw: unknown): number {
-  if (typeof raw === "number" && Number.isFinite(raw))
-    return Math.max(0, Math.trunc(raw));
-  if (typeof raw === "string" && Number.isFinite(parseInt(raw, 10)))
-    return Math.max(0, parseInt(raw, 10));
-  return 0;
-}
-
-export async function queueHyperFocusComplete(
-  payload: HyperFocusCompletePayload,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { ok: false, error: "Not authenticated" };
-  }
-
-  const { data: statRow } = await supabase
-    .from("study_items")
-    .select("mastery_score, times_used")
-    .eq("id", payload.study_item_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const mastery_score = coerceMastery(statRow?.mastery_score);
-  const times_used = coerceTimesUsed(statRow?.times_used);
-
-  return enqueueStudyActivity("hyper_focus_complete", {
-    ...payload,
-    mastery_score,
-    times_used,
-  });
-}
-
 export async function queueRapidReviewComplete(
   payload: RapidReviewCompletePayload,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -144,5 +93,52 @@ export async function queueRapidReviewComplete(
   return enqueueStudyActivity("rapid_review_complete", {
     ratings: payload.ratings,
     partial: payload.partial === true,
+  });
+}
+
+export type StudyItemArchivePayload = {
+  study_item_id: string;
+  archived: boolean;
+};
+
+export async function queueStudyItemArchive(
+  payload: StudyItemArchivePayload,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const study_item_id =
+    typeof payload.study_item_id === "string"
+      ? payload.study_item_id.trim()
+      : "";
+  if (!study_item_id) {
+    return { ok: false, error: "Missing study item" };
+  }
+  if (typeof payload.archived !== "boolean") {
+    return { ok: false, error: "Invalid archived value" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("study_items")
+    .select("id")
+    .eq("id", study_item_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, error: fetchError.message };
+  }
+  if (!row) {
+    return { ok: false, error: "Not found" };
+  }
+
+  return enqueueStudyActivity("study_item_change", {
+    study_item_id,
+    archived: payload.archived,
   });
 }

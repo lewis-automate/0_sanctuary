@@ -32,16 +32,16 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <div className="flex min-h-[calc(100dvh-5rem)] items-center justify-center px-6">
-        <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+        <div className="w-full max-w-sm rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             Check your email
           </p>
-          <p className="mt-4 text-sm text-slate-700">
+          <p className="mt-4 text-sm text-[var(--prose-text)]">
             If an account exists for <strong>{email}</strong>, we’ve sent a link to reset your password.
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-block text-sm font-medium text-slate-900 underline underline-offset-2"
+            className="mt-6 inline-block text-sm font-medium text-[var(--foreground)] underline underline-offset-2"
           >
             Back to sign in
           </Link>
@@ -52,14 +52,14 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="flex min-h-[calc(100dvh-5rem)] items-center justify-center px-6">
-      <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+      <div className="w-full max-w-sm rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm">
+        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           Sanctuary
         </p>
-        <h1 className="mt-2 text-center font-serif text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-center font-serif text-2xl font-semibold tracking-tight text-[var(--foreground)]">
           Reset password
         </h1>
-        <p className="mt-2 text-center text-sm text-slate-600">
+        <p className="mt-2 text-center text-sm text-[var(--text-muted)]">
           Enter your email and we’ll send you a link to set a new password.
         </p>
 
@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500"
+              className="block text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]"
             >
               Email
             </label>
@@ -78,26 +78,31 @@ export default function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+              className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="you@example.com"
             />
           </div>
           {message && (
-            <p className={`text-sm ${message.error ? "text-red-600" : "text-slate-600"}`}>
+            <p
+              className={`text-sm ${message.error ? "text-[var(--semantic-danger-inline)]" : "text-[var(--prose-text)]"}`}
+            >
               {message.text}
             </p>
           )}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Sending…" : "Send reset link"}
           </button>
         </form>
 
         <p className="mt-4 text-center">
-          <Link href="/login" className="text-sm text-slate-500 hover:text-slate-700">
+          <Link
+            href="/login"
+            className="text-sm text-[var(--text-muted)] hover:text-[var(--foreground)]"
+          >
             Back to sign in
           </Link>
         </p>

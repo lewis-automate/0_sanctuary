@@ -1,7 +1,7 @@
 # Deploying to Vercel
 
 1. **Connect the repo**  
-   In [Vercel](https://vercel.com), import this project (e.g. from GitHub). Use the `0_sanctuary` directory as the **Root Directory** if the repo root is the parent.
+   In [Vercel](https://vercel.com), import this project (e.g. from GitHub). Set **Root Directory** to the **Git repository root** (where the top-level `package.json` and `vercel.json` live). The repo is an npm workspace: installs and `npm run build` run from there and build the Next.js app in `0_sanctuary`.
 
 2. **Environment variables**  
    In the project’s Vercel **Settings → Environment Variables**, add:
@@ -16,4 +16,4 @@
    Push to your connected branch or trigger a deploy from the Vercel dashboard. The build runs `npm run build` and uses the Next.js preset.
 
 **CLI (optional):**  
-From this directory, run `npx vercel` and follow the prompts, then add the env vars in the dashboard.
+From the repository root, run `npx vercel` and follow the prompts, then add the env vars in the dashboard.

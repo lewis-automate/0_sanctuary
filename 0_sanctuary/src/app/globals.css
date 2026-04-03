@@ -1,9 +1,123 @@
 @import "tailwindcss";
 
+/* Shared layout constant (not theme-specific). */
 :root {
-  /* Slightly warmer background, same foreground */
+  --app-bottom-nav-height: 4.875rem;
+}
+
+/* Light: warm paper + ink (existing identity). */
+html[data-app-theme="light"] {
   --background: #fbf5ef;
   --foreground: #0f172a;
+  --surface-elevated: #f5ece3;
+  --surface-panel: rgb(251 245 239 / 0.9);
+  --surface-panel-solid: #fbf5ef;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --nav-active-bg: #0f172a;
+  --nav-active-fg: #fdfcfb;
+  --nav-idle-text: #334155;
+  --nav-hover-bg: rgba(15, 23, 42, 0.05);
+  --text-muted: #64748b;
+  --field-bg: rgb(255 255 255 / 0.82);
+  --field-border: #e2e8f0;
+  --field-text: #0f172a;
+  --field-placeholder: #64748b;
+  --prose-text: #334155;
+  --reader-control-bg: rgb(253 252 251 / 0.92);
+  --reader-control-border: rgb(226 232 240 / 0.95);
+  --reader-control-icon: #334155;
+  --subnav-panel: rgb(239 228 216 / 0.95);
+  --subnav-panel-border: rgb(226 232 240 / 0.9);
+  --subnav-shadow: 0 -8px 32px rgb(15 23 42 / 0.09);
+  --chrome-fab-bg: rgb(251 245 239 / 0.9);
+  --chrome-fab-hover: rgb(245 236 227 / 0.95);
+  --reader-surface: rgb(253 252 251 / 0.92);
+  --reader-surface-solid: #fdfcfb;
+  --reader-border-muted: rgb(255 255 255 / 0.4);
+
+  /* Status & badges (soft paper in light) */
+  --semantic-success-bg: #ecfdf5;
+  --semantic-success-border: #a7f3d0;
+  --semantic-success-text: #065f46;
+  --semantic-success-icon: #10b981;
+  --semantic-success-hover: rgb(16 185 129 / 0.14);
+  --semantic-success-inline: #059669;
+
+  --semantic-warning-bg: #fffbeb;
+  --semantic-warning-border: #fde68a;
+  --semantic-warning-text: #92400e;
+  --semantic-warning-title: #78350f;
+  --semantic-warning-dot: #d97706;
+  --semantic-warning-row-border: rgb(245 158 11 / 0.45);
+  --semantic-warning-row-bg: rgb(245 158 11 / 0.1);
+
+  --semantic-danger-bg: #fef2f2;
+  --semantic-danger-border: #fecaca;
+  --semantic-danger-text: #991b1b;
+  --semantic-danger-title: #7f1d1d;
+  --semantic-danger-muted: #b91c1c;
+  --semantic-danger-hover: rgb(239 68 68 / 0.14);
+  --semantic-danger-soft-border: #ffe4e6;
+  --semantic-danger-inline: #dc2626;
+}
+
+/* Dark: muted blue-violet gray; avoid bright “pill” nav + illegible slate-on-dark. */
+html[data-app-theme="dark"] {
+  --background: #1a1d26;
+  --foreground: #ebe8e3;
+  --surface-elevated: #22262f;
+  --surface-panel: rgb(34 38 47 / 0.94);
+  --surface-panel-solid: #22262f;
+  --border-default: #3e4558;
+  --border-strong: #5c6478;
+  /* Subtle active chip — not a large off-white block */
+  --nav-active-bg: #323848;
+  --nav-active-fg: #f4f2ef;
+  --nav-idle-text: #a8a4a0;
+  --nav-hover-bg: rgb(235 232 227 / 0.06);
+  --text-muted: #9d988f;
+  --field-bg: #262b36;
+  --field-border: #454c5e;
+  --field-text: #ebe8e3;
+  --field-placeholder: #8b8f9c;
+  --prose-text: #cfc9bf;
+  --reader-control-bg: rgb(38 43 54 / 0.88);
+  --reader-control-border: rgb(92 100 120 / 0.45);
+  --reader-control-icon: #d4d0c8;
+  --subnav-panel: rgb(26 30 38 / 0.97);
+  --subnav-panel-border: rgb(62 69 88 / 0.75);
+  --subnav-shadow: 0 -8px 28px rgb(0 0 0 / 0.4);
+  --chrome-fab-bg: rgb(34 38 47 / 0.94);
+  --chrome-fab-hover: rgb(42 47 58 / 0.96);
+  --reader-surface: rgb(30 35 44 / 0.96);
+  --reader-surface-solid: #1e232c;
+  --reader-border-muted: rgb(80 88 108 / 0.45);
+
+  /* Status & badges (muted, no bright mint/cream blocks) */
+  --semantic-success-bg: rgb(24 40 34 / 0.72);
+  --semantic-success-border: rgb(74 124 102 / 0.45);
+  --semantic-success-text: #b8e0c8;
+  --semantic-success-icon: #4ade80;
+  --semantic-success-hover: rgb(74 222 128 / 0.14);
+  --semantic-success-inline: #86efbc;
+
+  --semantic-warning-bg: rgb(42 36 22 / 0.75);
+  --semantic-warning-border: rgb(180 140 70 / 0.32);
+  --semantic-warning-text: #e8d5b0;
+  --semantic-warning-title: #f2e6c9;
+  --semantic-warning-dot: #e8a84d;
+  --semantic-warning-row-border: rgb(232 168 77 / 0.35);
+  --semantic-warning-row-bg: rgb(232 168 77 / 0.09);
+
+  --semantic-danger-bg: rgb(44 28 28 / 0.78);
+  --semantic-danger-border: rgb(180 90 90 / 0.38);
+  --semantic-danger-text: #f0c4c4;
+  --semantic-danger-title: #fce8e8;
+  --semantic-danger-muted: #e8a8a8;
+  --semantic-danger-hover: rgb(248 113 113 / 0.14);
+  --semantic-danger-soft-border: rgb(127 29 29 / 0.45);
+  --semantic-danger-inline: #fca5a5;
 }
 
 @theme inline {

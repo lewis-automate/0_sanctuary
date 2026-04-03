@@ -52,14 +52,14 @@ export function LibraryList({ items: initialItems }: Props) {
             }}
             className={`inline-flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
               key === sortKey
-                ? "border-slate-950 bg-slate-950 text-[#FDFCFB]"
-                : "border-slate-200 bg-white/60 text-slate-700 hover:bg-white"
+                ? "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                : "border-[var(--border-default)] bg-[var(--field-bg)] text-[var(--field-text)] hover:border-[var(--border-strong)]"
             }`}
           >
             <span>{SORT_LABELS[key]}</span>
             {key === sortKey && (
               <span
-                className="ml-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/18 text-base font-bold leading-none text-[#FDFCFB]"
+                className="ml-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--nav-active-fg)]/18 text-base font-bold leading-none text-[var(--nav-active-fg)]"
                 aria-hidden
               >
                 {sortDirection === "asc" ? "↑" : "↓"}
@@ -69,7 +69,7 @@ export function LibraryList({ items: initialItems }: Props) {
         ))}
       </div>
       <div className="mt-2">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
           <input
             type="checkbox"
             checked={unreadOnly}
@@ -84,7 +84,7 @@ export function LibraryList({ items: initialItems }: Props) {
                 setSortDirection("desc");
               }
             }}
-            className="h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-950 focus:ring-slate-950"
+            className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-[var(--nav-active-bg)]"
           />
           Unread only
         </label>
@@ -92,21 +92,21 @@ export function LibraryList({ items: initialItems }: Props) {
 
       <div className="mt-6 space-y-3">
         {initialItems.length === 0 ? (
-          <p className="text-center text-slate-600">No stories yet.</p>
+          <p className="text-center text-[var(--text-muted)]">No stories yet.</p>
         ) : items.length === 0 ? (
-          <p className="text-center text-slate-600">
+          <p className="text-center text-[var(--text-muted)]">
             No stories match this filter.
           </p>
         ) : (
           items.map((item) => {
             const hasReads = item.read_count > 0;
             const cardClasses = hasReads
-              ? "relative block rounded-3xl border border-slate-300 bg-white/90 p-5 shadow-sm transition-colors hover:bg-white"
-              : "relative block rounded-3xl border border-slate-200 bg-white/70 p-5 transition-colors hover:bg-white";
+              ? "relative block rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-panel)] p-5 shadow-sm transition-colors hover:bg-[var(--surface-elevated)]"
+              : "relative block rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-5 transition-colors hover:bg-[var(--surface-elevated)]";
 
-            const titleClasses = "text-base font-semibold text-slate-900";
+            const titleClasses = "text-base font-semibold text-[var(--foreground)]";
 
-            const metaClasses = "mt-1 flex flex-wrap gap-x-4 gap-y-0 text-sm text-slate-700";
+            const metaClasses = "mt-1 flex flex-wrap gap-x-4 gap-y-0 text-sm text-[var(--text-muted)]";
 
             return (
               <Link
@@ -115,8 +115,11 @@ export function LibraryList({ items: initialItems }: Props) {
                 className={cardClasses}
               >
                 {hasReads && (
-                  <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                  <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--semantic-success-text)]">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-[var(--semantic-success-icon)]"
+                      aria-hidden
+                    />
                     Read
                   </span>
                 )}

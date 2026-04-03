@@ -96,39 +96,44 @@ export function FeedbackSection({
   }, [feedbackExpandedId, visibleItems]);
 
   return (
-    <section aria-label="Feedback" className="space-y-4 text-sm text-slate-700">
+    <section
+      aria-label="Feedback"
+      className="space-y-4 text-sm text-[var(--prose-text)]"
+    >
       {!hideSectionTitle ? (
-        <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.18em] text-slate-500 sm:text-left">
+        <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)] sm:text-left">
           Feedback
         </p>
       ) : null}
 
-      {feedbackLoading && <p className="text-slate-500">Loading feedback…</p>}
-      {feedbackError && <p className="text-red-600">{feedbackError}</p>}
+      {feedbackLoading && (
+        <p className="text-[var(--text-muted)]">Loading feedback…</p>
+      )}
+      {feedbackError && <p className="text-[var(--semantic-danger-inline)]">{feedbackError}</p>}
       {!feedbackLoading && !feedbackError && feedbackItems.length === 0 && (
-        <p className="text-slate-500">No feedback yet.</p>
+        <p className="text-[var(--text-muted)]">No feedback yet.</p>
       )}
 
       {!feedbackLoading && !feedbackError && feedbackItems.length > 0 ? (
         <div className="mt-5">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
             <input
               type="checkbox"
               checked={unreviewedOnly}
               onChange={(e) => setUnreviewedOnly(e.target.checked)}
-              className="h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-950 focus:ring-slate-950"
+              className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-[var(--nav-active-bg)]"
             />
             Unreviewed only
           </label>
         </div>
       ) : null}
 
-      <ul className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white/70">
+      <ul className="mt-6 divide-y divide-[var(--border-default)] rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)]">
         {!feedbackLoading &&
         !feedbackError &&
         feedbackItems.length > 0 &&
         visibleItems.length === 0 ? (
-          <li className="px-4 py-6 text-center text-slate-500">
+          <li className="px-4 py-6 text-center text-[var(--text-muted)]">
             No feedback matches this filter.
           </li>
         ) : null}
@@ -136,15 +141,15 @@ export function FeedbackSection({
           const isExpanded = feedbackExpandedId === item.id;
           return (
             <li key={item.id}>
-              <div className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-slate-50">
+              <div className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-[var(--nav-hover-bg)]">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 flex-1 font-medium text-slate-900">
+                  <p className="min-w-0 flex-1 font-medium text-[var(--foreground)]">
                     {item.raw_input}
                   </p>
                   {item.reviewed ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--semantic-success-text)]">
                       <span
-                        className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                        className="h-1.5 w-1.5 rounded-full bg-[var(--semantic-success-icon)]"
                         aria-hidden
                       />
                       Reviewed
@@ -158,7 +163,7 @@ export function FeedbackSection({
                     onClick={() =>
                       setFeedbackExpandedId(isExpanded ? null : item.id)
                     }
-                    className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2.5 text-xs font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
                     aria-expanded={isExpanded}
                   >
                     {isExpanded ? (
@@ -202,7 +207,7 @@ export function FeedbackSection({
                         // ignore copy errors
                       }
                     }}
-                    className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                    className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2.5 text-xs font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
                   >
                     <Copy
                       className="h-3.5 w-3.5 shrink-0"
@@ -214,16 +219,16 @@ export function FeedbackSection({
                 </div>
 
                 {copiedId === item.id && (
-                  <div className="text-[11px] font-medium text-slate-500 transition-opacity duration-300">
+                  <div className="text-[11px] font-medium text-[var(--text-muted)] transition-opacity duration-300">
                     copied
                   </div>
                 )}
 
                 {isExpanded && (
-                  <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  <div className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
                     {item.alternate_version && (
                       <p>
-                        <span className="font-semibold text-slate-700">
+                        <span className="font-semibold text-[var(--foreground)]">
                           Alternate version:
                         </span>{" "}
                         {item.alternate_version}
@@ -231,7 +236,7 @@ export function FeedbackSection({
                     )}
                     {item.feedback && (
                       <p>
-                        <span className="font-semibold text-slate-700">
+                        <span className="font-semibold text-[var(--foreground)]">
                           Feedback:
                         </span>{" "}
                         {item.feedback}
@@ -239,7 +244,7 @@ export function FeedbackSection({
                     )}
                     {item.focus_point && (
                       <p>
-                        <span className="font-semibold text-slate-700">
+                        <span className="font-semibold text-[var(--foreground)]">
                           Focus point:
                         </span>{" "}
                         {item.focus_point}
@@ -248,7 +253,7 @@ export function FeedbackSection({
                     <div className="pt-2">
                       <Link
                         href={`/writing/practice/${encodeURIComponent(item.id)}`}
-                        className="flex w-full items-center justify-center rounded-2xl bg-slate-900 py-3 text-center text-sm font-medium leading-snug text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                        className="flex w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-3 text-center text-sm font-medium leading-snug text-[var(--nav-active-fg)] transition-colors hover:opacity-90"
                       >
                         Start a review session with tutor
                       </Link>

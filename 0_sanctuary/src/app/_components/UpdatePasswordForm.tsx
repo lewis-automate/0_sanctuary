@@ -42,7 +42,7 @@ export function UpdatePasswordForm() {
       <div>
         <label
           htmlFor="password"
-          className="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500"
+          className="block text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]"
         >
           New password
         </label>
@@ -54,14 +54,14 @@ export function UpdatePasswordForm() {
           required
           minLength={6}
           autoComplete="new-password"
-          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+          className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
           placeholder="••••••••"
         />
       </div>
       <div>
         <label
           htmlFor="confirmPassword"
-          className="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500"
+          className="block text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]"
         >
           Confirm new password
         </label>
@@ -73,13 +73,13 @@ export function UpdatePasswordForm() {
           required
           minLength={6}
           autoComplete="new-password"
-          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+          className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
           placeholder="••••••••"
         />
       </div>
       {message && (
         <p
-          className={`text-sm ${message.error ? "text-red-600" : "text-slate-600"}`}
+          className={`text-sm ${message.error ? "text-[var(--semantic-danger-inline)]" : "text-[var(--prose-text)]"}`}
         >
           {message.text}
         </p>
@@ -87,7 +87,7 @@ export function UpdatePasswordForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "Updating…" : "Update password"}
       </button>

@@ -41,11 +41,11 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[calc(100dvh-5rem)] items-center justify-center px-6">
-      <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+      <div className="w-full max-w-sm rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6 shadow-sm">
+        <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           Sanctuary
         </p>
-        <h1 className="mt-2 text-center font-serif text-2xl font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-2 text-center font-serif text-2xl font-semibold tracking-tight text-[var(--foreground)]">
           Welcome back
         </h1>
 
@@ -53,7 +53,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500"
+              className="block text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]"
             >
               Email
             </label>
@@ -64,7 +64,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+              className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="you@example.com"
             />
           </div>
@@ -73,13 +73,13 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="password"
-                className="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500"
+                className="block text-xs font-medium uppercase tracking-[0.16em] text-[var(--text-muted)]"
               >
                 Password
               </label>
               <a
                 href="/forgot-password"
-                className="text-xs text-slate-500 hover:text-slate-700"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--foreground)]"
               >
                 Forgot password?
               </a>
@@ -91,14 +91,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+              className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="••••••••"
             />
           </div>
 
           {message && (
             <p
-              className={`text-center text-sm ${message.error ? "text-red-600" : "text-slate-600"}`}
+              className={`text-center text-sm ${message.error ? "text-[var(--semantic-danger-inline)]" : "text-[var(--prose-text)]"}`}
             >
               {message.text}
             </p>
@@ -108,7 +108,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "…" : "Sign In"}
             </button>
@@ -116,7 +116,7 @@ export default function LoginPage() {
               type="button"
               onClick={handleSignUp}
               disabled={loading}
-              className="flex-1 rounded-2xl border border-slate-200 bg-white/80 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex-1 rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] py-2.5 text-sm font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Sign Up
             </button>

@@ -39,21 +39,21 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
       <button
         type="button"
         onClick={() => setConfirmOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 shadow-sm transition-colors duration-200 hover:border-slate-300 hover:bg-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] shadow-sm transition-colors duration-200 hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
         aria-label="Go back"
       >
-        <ArrowLeft className="h-4 w-4 text-slate-700" />
+        <ArrowLeft className="h-4 w-4 text-[var(--reader-control-icon)]" />
       </button>
 
       <div ref={ref} className="relative">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 shadow-sm transition-colors duration-200 hover:border-slate-300 hover:bg-white"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] shadow-sm transition-colors duration-200 hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]"
           aria-label="Font size"
           aria-expanded={open}
         >
-          <Type className="h-4 w-4 text-slate-700" />
+          <Type className="h-4 w-4 text-[var(--reader-control-icon)]" />
         </button>
 
         <AnimatePresence>
@@ -63,7 +63,7 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -4, scale: 0.96 }}
               transition={{ duration: 0.15 }}
-              className="absolute left-0 top-full z-50 mt-2 flex flex-col gap-0.5 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg"
+              className="absolute left-0 top-full z-50 mt-2 flex flex-col gap-0.5 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-1.5 shadow-lg"
             >
               {SIZES.map(({ id, label }) => (
                 <button
@@ -75,8 +75,8 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
                   }}
                   className={`rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                     fontSize === id
-                      ? "bg-slate-900 text-[#FDFCFB]"
-                      : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                      : "text-[var(--foreground)] hover:bg-[var(--surface-elevated)]"
                   }`}
                 >
                   {label}
@@ -112,11 +112,11 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="confirm-title"
-                className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-xl"
+                className="w-full max-w-sm rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-xl"
               >
                 <p
                   id="confirm-title"
-                  className="text-center text-sm text-slate-700"
+                  className="text-center text-sm text-[var(--foreground)]"
                 >
                   Are you sure you want to return? Progress will be lost.
                 </p>
@@ -124,7 +124,7 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(false)}
-                    className="flex-1 rounded-2xl border border-slate-200 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-elevated)]"
                   >
                     Stay
                   </button>
@@ -134,7 +134,7 @@ export function ReaderControls({ fontSize, onFontSizeChange }: Props) {
                       setConfirmOpen(false);
                       router.back();
                     }}
-                    className="flex-1 rounded-2xl bg-slate-900 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800"
+                    className="flex-1 rounded-2xl bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90"
                   >
                     Go back
                   </button>

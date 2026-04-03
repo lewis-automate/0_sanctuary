@@ -7,7 +7,7 @@ type Props = {
   headingLevel?: 1 | 2;
 };
 
-const titleClass = "text-xl font-semibold text-slate-900";
+const titleClass = "text-xl font-semibold text-[var(--foreground)]";
 
 export function AddVocabScreen({ headingLevel = 1 }: Props) {
   return (

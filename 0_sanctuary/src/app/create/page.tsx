@@ -6,7 +6,16 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { queueStoryGeneration } from "./actions";
 
-const DIFFICULTY_OPTIONS = ["A2", "A2/B1", "B1", "B1/B2", "B2", "B2/C1", "C1"] as const;
+const DIFFICULTY_OPTIONS = [
+  "A1",
+  "A1/A2",
+  "A2",
+  "A2/B1",
+  "B1",
+  "B1/B2",
+  "B2",
+  "B2/C1",
+] as const;
 
 /** Long enough for success swipe + fade; re-tune if SUCCESS_SWIPE_MS / SUCCESS_FADE_MS change. */
 const COOLDOWN_SECONDS = 5;
@@ -134,18 +143,18 @@ export default function CreatePage() {
   return (
     <FadeIn className="mx-auto w-full max-w-prose">
       <header className="mb-6 text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           Create Reading Material
         </p>
       </header>
 
-      <p className="mb-6 text-left text-sm italic leading-relaxed text-slate-600 sm:text-left">
-      Empty fields will use your default settings.
+      <p className="mb-6 text-left text-sm italic leading-relaxed text-[var(--text-muted)] sm:text-left">
+        Empty fields will use your default settings.
       </p>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
         <section>
-          <label className="block text-sm font-medium text-slate-1000">
+          <label className="block text-sm font-medium text-[var(--foreground)]">
             Choose a topic
           </label>
           <div className="relative mt-3">
@@ -154,27 +163,27 @@ export default function CreatePage() {
               maxLength={200}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 px-3 py-3 pb-8 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+              className="w-full resize-none rounded-3xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-3 pb-8 text-sm leading-relaxed text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="What do you want the writing to be about...?"
             />
-            <span className="absolute bottom-3 right-3 text-xs text-slate-400">
+            <span className="absolute bottom-3 right-3 text-xs text-[var(--field-placeholder)]">
               {topic.length}/200
             </span>
           </div>
         </section>
 
-        <div className="border-t border-slate-200 pt-2">
+        <div className="border-t border-[var(--border-default)] pt-2">
           <button
             type="button"
             id="create-more-options-label"
             aria-expanded={moreOptionsOpen}
             aria-controls="create-more-options-panel"
             onClick={() => setMoreOptionsOpen((open) => !open)}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-left text-sm font-medium text-slate-800 transition-colors duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-white"
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-4 py-3 text-left text-sm font-medium text-[var(--foreground)] transition-colors duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-[var(--surface-elevated)]"
           >
             <span>More options</span>
             <motion.span
-              className="inline-block text-slate-500"
+              className="inline-block text-[var(--text-muted)]"
               aria-hidden
               initial={false}
               animate={{
@@ -225,32 +234,30 @@ export default function CreatePage() {
             className="space-y-6 overflow-hidden"
           >
         <section>
-          <label className="block text-sm font-medium text-slate-1000">
+          <label className="block text-sm font-medium text-[var(--foreground)]">
             Tone or personality for the writer
           </label>
-          <p className="mt-1 text-xs text-slate-500">
-          The how...
-          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">The how...</p>
           <div className="relative mt-3">
             <textarea
               rows={3}
               maxLength={200}
               value={tone}
               onChange={(e) => setTone(e.target.value)}
-              className="w-full resize-none rounded-3xl border border-slate-200 bg-white/80 px-3 py-3 pb-8 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+              className="w-full resize-none rounded-3xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-3 pb-8 text-sm leading-relaxed text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="Example: The omniscient narrator. Kind, wise, and insightful. Write like it's the winner for a teen literature contest."
             />
-            <span className="absolute bottom-3 right-3 text-xs text-slate-400">
+            <span className="absolute bottom-3 right-3 text-xs text-[var(--field-placeholder)]">
               {tone.length}/200
             </span>
           </div>
         </section>
 
         <section>
-          <label className="block text-sm font-medium text-slate-1000">
+          <label className="block text-sm font-medium text-[var(--foreground)]">
             Difficulty
           </label>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Recommended: Start slightly below your current level.
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
@@ -263,13 +270,15 @@ export default function CreatePage() {
                   onClick={() => setDifficulty((d) => (d === label ? null : label))}
                   className={`flex items-center justify-start gap-2 rounded-2xl border px-3 py-2 transition-colors ${
                     isSelected
-                      ? "border-slate-900 bg-slate-900 text-[#FDFCFB]"
-                      : "border-slate-200 bg-white/70 text-slate-700 hover:bg-white"
+                      ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                      : "border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--field-text)] hover:border-[var(--border-strong)]"
                   }`}
                 >
                   <span
                     className={`inline-block h-3 w-3 rounded-full border ${
-                      isSelected ? "border-[#FDFCFB] bg-[#FDFCFB]" : "border-slate-300"
+                      isSelected
+                        ? "border-[var(--nav-active-fg)] bg-[var(--nav-active-fg)]"
+                        : "border-[var(--border-strong)]"
                     }`}
                   />
                   <span>{label}</span>
@@ -280,10 +289,10 @@ export default function CreatePage() {
         </section>
 
         <section>
-          <label className="block text-sm font-medium text-slate-1000">
+          <label className="block text-sm font-medium text-[var(--foreground)]">
             Target word-count
           </label>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             400-800 at the right level makes for a 5-10 minute read.
           </p>
           <input
@@ -292,16 +301,16 @@ export default function CreatePage() {
             pattern="[0-9]*"
             value={wordCount}
             onChange={handleWordCountChange}
-            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+            className="mt-3 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
             placeholder="e.g. 400 (max 2500)"
           />
         </section>
 
         <section>
-          <label className="block text-sm font-medium text-slate-1000">
+          <label className="block text-sm font-medium text-[var(--foreground)]">
             Topic memory
           </label>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             This works only if topic already exists.
           </p>
           <input
@@ -311,7 +320,7 @@ export default function CreatePage() {
             maxLength={2}
             value={topicMemory}
             onChange={handleTopicMemoryChange}
-            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0"
+            className="mt-3 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
             placeholder="0–99 (optional)"
           />
         </section>
@@ -319,13 +328,13 @@ export default function CreatePage() {
         </div>
 
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-[var(--semantic-danger-inline)]">{error}</p>
         )}
         <div className="pt-2">
           <button
             type="submit"
             disabled={submitting || countdown > 0}
-            className="flex w-full items-center justify-center rounded-3xl bg-slate-900 px-4 py-3 text-sm font-semibold text-[#FDFCFB] shadow-sm transition-[color,background-color,opacity,transform] duration-[1.45s] ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-slate-800 active:scale-[0.985] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 motion-reduce:transition-colors motion-reduce:duration-200"
+            className="flex w-full items-center justify-center rounded-3xl bg-[var(--nav-active-bg)] px-4 py-3 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-[color,background-color,opacity,transform] duration-[1.45s] ease-[cubic-bezier(0.83,0,0.17,1)] hover:opacity-90 active:scale-[0.985] motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 motion-reduce:transition-colors motion-reduce:duration-200"
           >
             {submitting
               ? "Queuing…"
@@ -343,11 +352,14 @@ export default function CreatePage() {
           aria-modal="true"
           aria-labelledby="success-dialog-title"
         >
-          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-[#FDFCFB] p-6 shadow-lg">
-            <h2 id="success-dialog-title" className="font-serif text-lg font-semibold text-slate-900">
+          <div className="w-full max-w-sm rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-lg">
+            <h2
+              id="success-dialog-title"
+              className="font-serif text-lg font-semibold text-[var(--foreground)]"
+            >
               Story queued
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
               Check your library for progress. You can submit again in{" "}
               <span className="font-medium tabular-nums">{countdown}</span>s.
             </p>

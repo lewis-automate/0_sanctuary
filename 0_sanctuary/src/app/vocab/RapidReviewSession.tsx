@@ -20,7 +20,7 @@ type Props = {
 };
 
 const topBackBtnClass =
-  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-[#fbf5ef]/90 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20 disabled:opacity-50";
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 disabled:opacity-50";
 
 export function RapidReviewSession({ onExit, onComplete }: Props) {
   const [queue, setQueue] = useState<QueueItem[] | null>(null);
@@ -228,26 +228,26 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
   }, []);
 
   const chip =
-    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed bg-white";
+    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed bg-[var(--field-bg)]";
   const chipHard =
-    `border-red-200/80 text-red-800 hover:bg-red-50 disabled:border-slate-200/80 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70 disabled:hover:bg-slate-100`;
+    "border-[var(--semantic-danger-border)] text-[var(--semantic-danger-inline)] hover:bg-[var(--semantic-danger-hover)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
   const chipGood =
-    "text-slate-800 border-slate-300 hover:bg-slate-50 disabled:border-slate-200/80 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70 disabled:hover:bg-slate-100";
+    "text-[var(--foreground)] border-[var(--border-default)] hover:bg-[var(--surface-elevated)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
   const chipEasy =
-    "border-emerald-200/90 text-emerald-900 hover:bg-emerald-50 disabled:border-slate-200/80 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70 disabled:hover:bg-slate-100";
+    "border-[var(--semantic-success-border)] text-[var(--semantic-success-text)] hover:bg-[var(--semantic-success-hover)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
 
   const hintBtn =
     "flex-1 rounded-2xl border px-4 py-3.5 text-sm font-medium transition-colors";
-  const hintBtnIdle = `${hintBtn} border-slate-200 bg-white text-slate-800 shadow-sm hover:border-slate-300 hover:bg-slate-50`;
-  const hintBtnActive = `${hintBtn} border-slate-900 bg-slate-950 text-[#FDFCFB] shadow-sm`;
+  const hintBtnIdle = `${hintBtn} border-[var(--border-default)] bg-[var(--field-bg)] text-[var(--field-text)] shadow-sm hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]`;
+  const hintBtnActive = `${hintBtn} border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] shadow-sm`;
 
   const btnSecondary =
-    "rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-white";
+    "rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-4 py-2.5 text-sm font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]";
   const btnPrimary =
-    "rounded-2xl border border-slate-950 bg-slate-950 px-4 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800";
+    "rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90";
 
   const topBar = (
-    <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-between gap-3 bg-[#FDFCFB]/90 pb-2 pt-1 backdrop-blur sm:-mx-0">
+    <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-between gap-3 bg-[var(--background)]/92 pb-2 pt-1 backdrop-blur sm:-mx-0">
       <button
         type="button"
         onClick={requestExit}
@@ -259,7 +259,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
       </button>
       {sessionActive ? (
         <span
-          className="inline-flex min-w-[3.25rem] items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold tabular-nums text-slate-800 shadow-sm"
+          className="inline-flex min-w-[3.25rem] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold tabular-nums text-[var(--field-text)] shadow-sm"
           aria-live="polite"
         >
           {ordinal}/{total}
@@ -277,7 +277,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
     >
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/40 disabled:cursor-not-allowed"
+        className="absolute inset-0 bg-black/45 disabled:cursor-not-allowed"
         aria-label="Close dialog"
         disabled={exitBusy}
         onClick={() => !exitBusy && setExitDialogOpen(false)}
@@ -286,20 +286,20 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={exitDialogTitleId}
-        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-[#FDFCFB] p-6 shadow-lg"
+        className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-lg"
       >
         <h2
           id={exitDialogTitleId}
-          className="text-base font-semibold text-slate-900"
+          className="text-base font-semibold text-[var(--foreground)]"
         >
           Leave rapid review?
         </h2>
         {sessionActive ? (
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
             Given ratings are saved, but this session can&apos;t be resumed.
           </p>
         ) : (
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
             If you leave now, you&apos;ll exit rapid review. You can start
             again anytime from Practice.
           </p>
@@ -331,7 +331,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
       <div className="relative mx-auto flex max-w-lg flex-1 flex-col pb-10">
         {exitDialog}
         {topBar}
-        <p className="text-sm text-red-600">{loadError}</p>
+        <p className="text-sm text-[var(--semantic-danger-inline)]">{loadError}</p>
       </div>
     );
   }
@@ -341,7 +341,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
       <div className="relative mx-auto flex max-w-lg flex-1 flex-col pb-10">
         {exitDialog}
         {topBar}
-        <p className="text-slate-500" aria-live="polite">
+        <p className="text-[var(--text-muted)]" aria-live="polite">
           Loading cards…
         </p>
       </div>
@@ -353,7 +353,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
       <div className="relative mx-auto flex max-w-lg flex-1 flex-col pb-10">
         {exitDialog}
         {topBar}
-        <p className="text-slate-500">
+        <p className="text-[var(--text-muted)]">
           No saved words yet. Add some under Add first.
         </p>
       </div>
@@ -367,27 +367,27 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
 
       <div className="flex min-h-0 flex-1 flex-col px-1 sm:px-0">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-3 [-webkit-overflow-scrolling:touch]">
-          <p className="text-center text-2xl font-semibold leading-snug text-slate-900 sm:text-3xl">
+          <p className="text-center text-2xl font-semibold leading-snug text-[var(--foreground)] sm:text-3xl">
             {current?.vocab}
           </p>
           {current?.example_sentences?.trim() ? (
-            <p className="mt-4 text-center text-base leading-relaxed text-slate-600 sm:text-lg">
+            <p className="mt-4 text-center text-base leading-relaxed text-[var(--text-muted)] sm:text-lg">
               {current.example_sentences}
             </p>
           ) : (
-            <p className="mt-4 text-center text-sm italic text-slate-400">
+            <p className="mt-4 text-center text-sm italic text-[var(--field-placeholder)]">
               No example sentence yet.
             </p>
           )}
 
           {(showDefinition || showTranslation) && (
-            <div className="mt-8 space-y-4 text-left text-sm leading-relaxed text-slate-700">
+            <div className="mt-8 space-y-4 text-left text-sm leading-relaxed text-[var(--prose-text)]">
               {showDefinition && (
                 <div>
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-[var(--field-placeholder)]">
                     Definition
                   </p>
-                  <p className="mt-1.5 text-base text-slate-800">
+                  <p className="mt-1.5 text-base text-[var(--foreground)]">
                     {current?.definition?.trim()
                       ? current.definition
                       : "None saved yet."}
@@ -396,10 +396,10 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
               )}
               {showTranslation && (
                 <div>
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-[var(--field-placeholder)]">
                     Translation
                   </p>
-                  <p className="mt-1.5 text-base text-slate-800">
+                  <p className="mt-1.5 text-base text-[var(--foreground)]">
                     {current?.translation?.trim()
                       ? current.translation
                       : "None saved yet."}
@@ -410,17 +410,17 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
           )}
         </div>
 
-        <div className="shrink-0 space-y-3 border-t border-slate-200/90 bg-[#FDFCFB]/95 pt-3 backdrop-blur-sm pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="shrink-0 space-y-3 border-t border-[var(--border-default)] bg-[var(--background)]/95 pt-3 backdrop-blur-sm pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {ratingSaveError ? (
             <div
               role="alert"
-              className="rounded-2xl border border-red-200 bg-red-50/95 px-3 py-2.5 text-sm text-red-950"
+              className="rounded-2xl border border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-bg)] px-3 py-2.5 text-sm text-[var(--semantic-danger-title)]"
             >
               <p className="font-medium">Couldn&apos;t save</p>
-              <p className="mt-1 leading-relaxed text-red-900/95">
+              <p className="mt-1 leading-relaxed text-[var(--semantic-danger-text)]">
                 {ratingSaveError}
               </p>
-              <p className="mt-2 text-xs text-red-800/90">
+              <p className="mt-2 text-xs text-[var(--semantic-danger-muted)]">
                 Stay on this card and tap Hard, Good, or Easy again to retry.
               </p>
             </div>

@@ -15,7 +15,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("study_items")
-    .select("id, vocab, example_sentences, definition, translation, date_added")
+    .select(
+      "id, vocab, example_sentences, definition, translation, date_added, archived",
+    )
     .eq("user_id", user.id)
     .order("date_added", { ascending: false });
 

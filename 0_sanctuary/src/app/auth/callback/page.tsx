@@ -53,14 +53,17 @@ export default function AuthCallbackPage() {
   if (status === "error") {
     return (
       <div className="flex min-h-[calc(100dvh-5rem)] flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-slate-600">Invalid or expired reset link.</p>
+        <p className="text-[var(--text-muted)]">Invalid or expired reset link.</p>
         <a
           href="/forgot-password"
-          className="text-sm font-medium text-slate-900 underline underline-offset-2"
+          className="text-sm font-medium text-[var(--foreground)] underline underline-offset-2"
         >
           Request a new link
         </a>
-        <a href="/login" className="text-sm text-slate-500 hover:text-slate-700">
+        <a
+          href="/login"
+          className="text-sm text-[var(--text-muted)] hover:text-[var(--foreground)]"
+        >
           Back to sign in
         </a>
       </div>
@@ -69,7 +72,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="flex min-h-[calc(100dvh-5rem)] items-center justify-center px-6">
-      <p className="text-sm text-slate-500">Setting up…</p>
+      <p className="text-sm text-[var(--text-muted)]">Setting up…</p>
     </div>
   );
 }

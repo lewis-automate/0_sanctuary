@@ -18,15 +18,15 @@ type Props = {
 };
 
 const btnPrimary =
-  "rounded-2xl border border-slate-950 bg-slate-950 px-4 py-2.5 text-sm font-medium text-[#FDFCFB] transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 
 const btnSecondary =
-  "rounded-2xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-white";
+  "rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-4 py-2.5 text-sm font-medium text-[var(--field-text)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]";
 
 const bubbleUser =
-  "rounded-3xl rounded-br-lg border border-slate-200 bg-white/90 px-4 py-3 text-sm leading-relaxed text-slate-900";
+  "rounded-3xl rounded-br-lg border border-[var(--field-border)] bg-[var(--field-bg)] px-4 py-3 text-sm leading-relaxed text-[var(--field-text)]";
 const bubbleAssistant =
-  "rounded-3xl rounded-bl-lg border border-slate-200 bg-slate-50/90 px-4 py-3 text-sm leading-relaxed text-slate-800";
+  "rounded-3xl rounded-bl-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm leading-relaxed text-[var(--prose-text)]";
 
 export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
   const router = useRouter();
@@ -283,7 +283,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
           type="button"
           onClick={() => void handleBackPress()}
           disabled={markingDone}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-[#fbf5ef]/90 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20 disabled:opacity-50"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 disabled:opacity-50"
           aria-label="Back"
         >
           <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
@@ -297,7 +297,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/40"
+            className="absolute inset-0 bg-black/45"
             aria-label="Close dialog"
             onClick={() => setIncompleteDialogOpen(false)}
           />
@@ -305,15 +305,15 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={incompleteDialogTitleId}
-            className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-[#FDFCFB] p-6 shadow-lg"
+            className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-lg"
           >
             <h2
               id={incompleteDialogTitleId}
-              className="text-base font-semibold text-slate-900"
+              className="text-base font-semibold text-[var(--foreground)]"
             >
               Finish practice first?
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
               Leave at least 3 messages to count this lesson as complete.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -346,7 +346,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-slate-900/40"
+            className="absolute inset-0 bg-black/45"
             aria-label="Close dialog"
             onClick={() => setCompleteConfirmOpen(false)}
           />
@@ -354,15 +354,15 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={completeConfirmTitleId}
-            className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-[#FDFCFB] p-6 shadow-lg"
+            className="relative z-10 w-full max-w-md rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-6 shadow-lg"
           >
             <h2
               id={completeConfirmTitleId}
-              className="text-base font-semibold text-slate-900"
+              className="text-base font-semibold text-[var(--foreground)]"
             >
               Complete this lesson?
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
               We&apos;ll mark this practice as done and take you to the next
               step so you can keep your momentum.
             </p>
@@ -391,7 +391,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
 
       {languagesRequired && (
         <div
-          className="rounded-3xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950"
+          className="rounded-3xl border border-[var(--semantic-warning-border)] bg-[var(--semantic-warning-bg)] px-4 py-3 text-sm text-[var(--semantic-warning-text)]"
           role="status"
         >
           Set your target and native language in{" "}
@@ -403,7 +403,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
       )}
       {error && (
         <div
-          className="rounded-3xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm text-red-900"
+          className="rounded-3xl border border-[var(--semantic-danger-border)] bg-[var(--semantic-danger-bg)] px-4 py-3 text-sm text-[var(--semantic-danger-text)]"
           role="alert"
         >
           {error}
@@ -411,11 +411,13 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
       )}
 
       <div
-        className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-3xl border border-slate-200 bg-white/60 p-4 sm:p-5"
+        className="flex flex-1 flex-col gap-3 overflow-y-auto rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-4 sm:p-5"
         aria-live="polite"
       >
         {loading && messages.length === 0 && (
-          <p className="text-center text-sm text-slate-500">Starting your tutor…</p>
+          <p className="text-center text-sm text-[var(--text-muted)]">
+            Starting your tutor…
+          </p>
         )}
         {messages.map((m, i) => (
           <div
@@ -436,9 +438,9 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
             aria-live="polite"
             aria-label="Tutor is thinking"
           >
-            <div className="inline-flex max-w-[min(100%,36rem)] items-center rounded-3xl rounded-bl-lg border border-slate-200 bg-slate-50/90 px-4 py-3">
+            <div className="inline-flex max-w-[min(100%,36rem)] items-center rounded-3xl rounded-bl-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3">
               <span
-                className="select-none text-lg font-medium leading-none tracking-[0.35em] text-slate-400 animate-pulse"
+                className="select-none text-lg font-medium leading-none tracking-[0.35em] text-[var(--field-placeholder)] animate-pulse"
                 aria-hidden
               >
                 ...
@@ -449,15 +451,15 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+      <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
         <span className="tabular-nums" aria-live="polite">
           Your messages:{" "}
-          <span className="font-semibold text-slate-700">
+          <span className="font-semibold text-[var(--foreground)]">
             {userMessageCount} / {MAX_USER_PRACTICE_MESSAGES}
           </span>
         </span>
         {atUserMessageLimit && !sending ? (
-          <span className="text-right text-slate-600">
+          <span className="text-right text-[var(--prose-text)]">
             Limit reached for this practice.
           </span>
         ) : null}
@@ -482,7 +484,7 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
                 ? "You’ve used all messages for this practice."
                 : "Type your answer… (use Send when ready)"
           }
-          className="min-h-[5.5rem] w-full resize-y rounded-3xl border border-slate-200 bg-white/80 px-3 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-0 disabled:bg-slate-50"
+          className="min-h-[5.5rem] w-full resize-y rounded-3xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-3 text-sm leading-relaxed text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0 disabled:bg-[var(--surface-elevated)]"
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
@@ -492,8 +494,8 @@ export function PracticeChatClient({ feedbackId, focusPoint }: Props) {
             className={[
               "shrink-0 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed",
               meetsCompleteThreshold
-                ? "border-slate-950 bg-slate-950 text-[#FDFCFB] hover:bg-slate-800 disabled:opacity-50"
-                : "border-slate-200 bg-slate-100 text-slate-400 hover:bg-slate-100 disabled:opacity-70",
+                ? "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] hover:opacity-90 disabled:opacity-50"
+                : "border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] hover:bg-[var(--surface-elevated)] disabled:opacity-70",
             ].join(" ")}
           >
             {markingDone ? "Saving…" : "Complete lesson"}

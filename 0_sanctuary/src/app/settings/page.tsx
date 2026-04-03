@@ -5,6 +5,7 @@ import { FadeIn } from "../_components/FadeIn";
 import { LogoutButton } from "../_components/LogoutButton";
 import type { UserSettingsProfile } from "./actions";
 import { UserSettingsClient } from "./UserSettingsClient";
+import { normalizeAppTheme } from "@/lib/app-theme";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ function mapRowToUserProfile(
     ),
     preferred_tone: String(row.preferred_tone ?? ""),
     vocab_chunking: coerceVocabChunkingToBoolean(row.vocab_chunking),
+    app_theme: normalizeAppTheme(row.app_theme),
   };
 }
 
@@ -82,6 +84,7 @@ const EMPTY_PROFILE: UserSettingsProfile = {
   last_stories_filter: null,
   preferred_tone: "",
   vocab_chunking: false,
+  app_theme: "Light",
 };
 
 export default async function SettingsPage({ searchParams }: PageProps) {
@@ -183,17 +186,17 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         <div className="flex items-start gap-3 sm:items-center">
           <Link
             href="/"
-            className="mt-0.5 inline-flex shrink-0 rounded-full border border-slate-200 bg-[#fbf5ef]/90 p-2.5 text-slate-700 shadow-sm backdrop-blur transition-colors hover:border-slate-300 hover:bg-[#f5ece3]/95 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950/20 sm:mt-0"
+            className="mt-0.5 inline-flex shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 sm:mt-0"
             aria-label="Back to home"
           >
             <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
           </Link>
           <div className="min-w-0 flex-1 text-center sm:text-left">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
               Settings
             </p>
             {message && (
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="mt-2 text-sm text-[var(--prose-text)]">
                 {decodeURIComponent(message.replace(/\+/g, " "))}
               </p>
             )}
@@ -201,13 +204,13 @@ export default async function SettingsPage({ searchParams }: PageProps) {
         </div>
       </header>
 
-      <div className="mb-5 flex gap-2 text-sm font-medium text-slate-600">
-        <span className="rounded-full bg-slate-950 px-3 py-1 text-xs text-[#FDFCFB]">
+      <div className="mb-5 flex gap-2 text-sm font-medium text-[var(--text-muted)]">
+        <span className="rounded-full border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-3 py-1 text-xs text-[var(--nav-active-fg)]">
           User Settings
         </span>
         <Link
           href="/settings/password"
-          className="rounded-full bg-transparent px-3 py-1 text-xs text-slate-600 hover:bg-slate-900/5 hover:text-slate-900"
+          className="rounded-full bg-transparent px-3 py-1 text-xs text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--foreground)]"
         >
           Password
         </Link>

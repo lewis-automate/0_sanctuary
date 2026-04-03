@@ -11,6 +11,7 @@ export type UserSettingsProfile = {
   last_stories_filter: number | null;
   preferred_tone: string;
   vocab_chunking: boolean;
+  app_theme: "Light" | "Dark";
 };
 
 /** Every item has the same keys; new topics use id: null */

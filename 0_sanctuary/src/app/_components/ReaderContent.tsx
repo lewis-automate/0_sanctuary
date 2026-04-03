@@ -25,10 +25,12 @@ export function ReaderContent({
   if (!story) {
     return (
       <FadeIn className="mx-auto w-full max-w-prose text-center">
-        <p className="text-slate-600">{message ?? "No story found."}</p>
+        <p className="text-[var(--text-muted)]">
+          {message ?? "No story found."}
+        </p>
         <Link
           href="/library"
-          className="mt-4 inline-block text-sm font-medium text-slate-900 underline underline-offset-2"
+          className="mt-4 inline-block text-sm font-medium text-[var(--foreground)] underline underline-offset-2"
         >
           Go to library
         </Link>
@@ -42,13 +44,13 @@ export function ReaderContent({
 
       <FadeIn className="mx-auto w-full max-w-prose">
         <header className="text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
             {story.language} • {story.difficulty}
           </p>
-          <h1 className="mt-2 font-serif text-4xl font-semibold leading-tight tracking-tight text-slate-900">
+          <h1 className="mt-2 font-serif text-4xl font-semibold leading-tight tracking-tight text-[var(--foreground)]">
             {story.title}
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
             {story.wordCount.toLocaleString()} words
           </p>
         </header>
