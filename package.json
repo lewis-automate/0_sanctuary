@@ -1,0 +1,14 @@
+{
+  "name": "warp",
+  "private": true,
+  "workspaces": ["0_sanctuary"],
+  "dependencies": {
+    "0_sanctuary": "workspace:*"
+  },
+  "scripts": {
+    "build": "npm run build -w 0_sanctuary",
+    "dev": "npm run dev -w 0_sanctuary",
+    "start": "npm run start -w 0_sanctuary",
+    "lint": "npm run lint -w 0_sanctuary"
+  }
+}
