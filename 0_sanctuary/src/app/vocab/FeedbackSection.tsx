@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp, Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useActivityQueueProcessingTargets } from "@/lib/useActivityQueueProcessingTargets";
 
 type FeedbackItem = {
   id: string;
@@ -22,6 +23,7 @@ type FeedbackSectionProps = {
 export function FeedbackSection({
   hideSectionTitle = false,
 }: FeedbackSectionProps) {
+  const { feedbackReviewIds } = useActivityQueueProcessingTargets();
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([]);
   const [feedbackExpandedId, setFeedbackExpandedId] = useState<string | null>(
     null,
@@ -153,6 +155,14 @@ export function FeedbackSection({
                         aria-hidden
                       />
                       Reviewed
+                    </span>
+                  ) : feedbackReviewIds.has(item.id) ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--text-muted)] opacity-90"
+                        aria-hidden
+                      />
+                      Processing
                     </span>
                   ) : null}
                 </div>

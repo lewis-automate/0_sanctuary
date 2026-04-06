@@ -6,12 +6,11 @@ import {
 } from "@/lib/extract-json-string-field";
 import {
   countReaderSelectionGraphemes,
-  MAX_READER_SELECTION_GRAPHEMES,
+  MAX_READER_CONTEXT_CHARS,
+  MAX_READER_TRANSLATE_SELECTION_GRAPHEMES,
 } from "@/lib/reader-selection-limit";
 import { getUserLanguagePair } from "@/lib/user-languages";
 import { createClient } from "@/lib/supabase/server";
-
-const MAX_CONTEXT_CHARS = 5000;
 
 type Body = {
   text?: string;
@@ -126,22 +125,25 @@ export async function POST(request: Request) {
   const text = typeof body.text === "string" ? body.text.trim() : "";
   let context =
     typeof body.context === "string" ? body.context.trim() : "";
-  context = truncatePromptContext(context, MAX_CONTEXT_CHARS);
+  context = truncatePromptContext(context, MAX_READER_CONTEXT_CHARS);
 
   if (!text) {
     return NextResponse.json({ error: "Missing text" }, { status: 400 });
   }
 
-  if (countReaderSelectionGraphemes(text) > MAX_READER_SELECTION_GRAPHEMES) {
+  if (
+    countReaderSelectionGraphemes(text) >
+    MAX_READER_TRANSLATE_SELECTION_GRAPHEMES
+  ) {
     return NextResponse.json(
       {
-        error: `Selection is too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters). Shorten the highlight.`,
+        error: `Selection is too long (max ${MAX_READER_TRANSLATE_SELECTION_GRAPHEMES} characters). Shorten the highlight.`,
       },
       { status: 400 },
     );
   }
 
-  const longHighlight = countReaderSelectionGraphemes(text) > 120;
+  const longHighlight = countReaderSelectionGraphemes(text) > 60;
   const prompt = `Translate the highlighted text from ${targetLanguage} to ${nativeLanguage}.
 
 Highlighted text:

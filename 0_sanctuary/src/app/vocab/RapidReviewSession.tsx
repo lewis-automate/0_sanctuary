@@ -2,7 +2,10 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { queueRapidReviewComplete } from "./study-queue-actions";
+import {
+  queueRapidReviewComplete,
+  queueStudyItemArchive,
+} from "./study-queue-actions";
 
 type QueueItem = {
   id: string;
@@ -10,6 +13,7 @@ type QueueItem = {
   example_sentences: string | null;
   definition: string | null;
   translation: string | null;
+  archived: boolean | null;
 };
 
 type Rating = "hard" | "good" | "easy";
@@ -32,8 +36,17 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
   const [ratingSaveError, setRatingSaveError] = useState<string | null>(null);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
+  /** Local overrides; missing key → fall back to `item.archived` from server. */
+  const [archiveChoice, setArchiveChoice] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const exitDialogTitleId = useId();
   const historyGuardPlacedRef = useRef(false);
+  const archiveChoiceRef = useRef(archiveChoice);
+  archiveChoiceRef.current = archiveChoice;
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
   const sessionRatingsRef = useRef<
     {
       study_item_id: string;
@@ -56,7 +69,18 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         }
         const data = (await res.json()) as { items: QueueItem[] };
         if (!cancelled) {
-          setQueue(data.items ?? []);
+          const raw = data.items ?? [];
+          setQueue(
+            raw.map((row) => ({
+              ...row,
+              archived:
+                row.archived === true
+                  ? true
+                  : row.archived === false
+                    ? false
+                    : null,
+            })),
+          );
         }
       } catch (e) {
         if (!cancelled) {
@@ -99,8 +123,29 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
   useEffect(() => {
     if (queue !== null) {
       sessionRatingsRef.current = [];
+      setArchiveChoice({});
     }
   }, [queue]);
+
+  const flushArchivesOnExit = useCallback(async () => {
+    const q = queueRef.current;
+    if (!q?.length) return;
+    setArchiveError(null);
+    const choices = archiveChoiceRef.current;
+    for (const item of q) {
+      const checked = Object.prototype.hasOwnProperty.call(choices, item.id)
+        ? choices[item.id]
+        : item.archived === true;
+      if (!checked) continue;
+      const res = await queueStudyItemArchive({
+        study_item_id: item.id,
+        archived: true,
+      });
+      if (!res.ok) {
+        setArchiveError(res.error);
+      }
+    }
+  }, []);
 
   const current = queue && index < queue.length ? queue[index] : null;
   const total = queue?.length ?? 0;
@@ -116,6 +161,10 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
 
   useEffect(() => {
     setRatingSaveError(null);
+  }, [index]);
+
+  useEffect(() => {
+    setArchiveError(null);
   }, [index]);
 
   const submitRating = useCallback(
@@ -172,6 +221,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         ];
 
         if (index + 1 >= total) {
+          await flushArchivesOnExit();
           const report = await queueRapidReviewComplete({
             ratings: sessionRatingsRef.current,
             partial: false,
@@ -200,6 +250,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
       showTranslation,
       total,
       queueRapidReviewComplete,
+      flushArchivesOnExit,
     ],
   );
 
@@ -216,12 +267,13 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
           console.error("[RapidReview] Early-exit report queue failed:", report.error);
         }
       }
+      await flushArchivesOnExit();
     } finally {
       setExitBusy(false);
       setExitDialogOpen(false);
       onExit();
     }
-  }, [onExit]);
+  }, [flushArchivesOnExit, onExit, queueRapidReviewComplete]);
 
   const requestExit = useCallback(() => {
     setExitDialogOpen(true);
@@ -246,8 +298,15 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
   const btnPrimary =
     "rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90";
 
+  const currentArchiveChecked =
+    current != null
+      ? Object.prototype.hasOwnProperty.call(archiveChoice, current.id)
+        ? archiveChoice[current.id]
+        : current.archived === true
+      : false;
+
   const topBar = (
-    <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-between gap-3 bg-[var(--background)]/92 pb-2 pt-1 backdrop-blur sm:-mx-0">
+    <div className="sticky top-0 z-20 -mx-1 mb-4 flex items-center justify-between gap-2 bg-[var(--background)]/92 pb-2 pt-1 backdrop-blur sm:-mx-0 sm:gap-3">
       <button
         type="button"
         onClick={requestExit}
@@ -258,12 +317,39 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
       </button>
       {sessionActive ? (
-        <span
-          className="inline-flex min-w-[3.25rem] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold tabular-nums text-[var(--field-text)] shadow-sm"
-          aria-live="polite"
-        >
-          {ordinal}/{total}
-        </span>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+          {current ? (
+            <label className="inline-flex max-w-[min(11rem,42vw)] cursor-pointer items-center gap-1.5 text-xs font-medium leading-none text-[var(--foreground)] sm:max-w-none">
+              <input
+                type="checkbox"
+                checked={currentArchiveChecked}
+                disabled={exitBusy}
+                onChange={() => {
+                  if (!current || exitBusy) return;
+                  setArchiveError(null);
+                  setArchiveChoice((prev) => {
+                    const prevEffective = Object.prototype.hasOwnProperty.call(
+                      prev,
+                      current.id,
+                    )
+                      ? prev[current.id]
+                      : current.archived === true;
+                    return { ...prev, [current.id]: !prevEffective };
+                  });
+                }}
+                className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-2 focus:ring-[var(--nav-active-bg)] focus:ring-offset-1 focus:ring-offset-[var(--background)] disabled:opacity-60"
+                title="Archive this word when you leave or finish the session"
+              />
+              <span className="truncate">Archive word</span>
+            </label>
+          ) : null}
+          <span
+            className="inline-flex min-w-[3.25rem] shrink-0 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-1.5 text-xs font-semibold tabular-nums text-[var(--field-text)] shadow-sm"
+            aria-live="polite"
+          >
+            {ordinal}/{total}
+          </span>
+        </div>
       ) : (
         <span className="h-10 w-10 shrink-0" aria-hidden />
       )}
@@ -364,6 +450,14 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
     <div className="relative mx-auto flex h-[85dvh] max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col">
       {exitDialog}
       {topBar}
+      {archiveError ? (
+        <p
+          className="mb-2 text-center text-xs text-[var(--semantic-danger-inline)] sm:text-left"
+          role="alert"
+        >
+          {archiveError}
+        </p>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col px-1 sm:px-0">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-3 [-webkit-overflow-scrolling:touch]">

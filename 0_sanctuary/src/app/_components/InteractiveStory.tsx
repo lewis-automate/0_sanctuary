@@ -18,8 +18,12 @@ import {
   nudgeSelectionShrinkFromRight,
 } from "@/lib/nudge-text-selection";
 import {
-  isReaderSelectionWithinLimit,
-  MAX_READER_SELECTION_GRAPHEMES,
+  isReaderGrammarSelectionWithinLimit,
+  isReaderTranslateSelectionWithinLimit,
+  isReaderVocabSelectionWithinLimit,
+  MAX_READER_GRAMMAR_SELECTION_GRAPHEMES,
+  MAX_READER_TRANSLATE_SELECTION_GRAPHEMES,
+  MAX_READER_VOCAB_SELECTION_GRAPHEMES,
 } from "@/lib/reader-selection-limit";
 
 type FontSize = "sm" | "md" | "lg";
@@ -261,7 +265,7 @@ export function InteractiveStory({
   }, [showTooltipFromSelection]);
 
   const handleSaveVocab = useCallback(() => {
-    if (tooltip && isReaderSelectionWithinLimit(tooltip.text)) {
+    if (tooltip && isReaderVocabSelectionWithinLimit(tooltip.text)) {
       setSavedVocab((prev) => {
         if (prev.includes(tooltip.text) || prev.length >= 15) return prev;
         return [...prev, tooltip.text];
@@ -275,23 +279,39 @@ export function InteractiveStory({
     setSavedVocab((prev) => prev.filter((w) => w !== word));
   }, []);
 
-  const selectionWithinLimit = Boolean(
-    tooltip?.text && isReaderSelectionWithinLimit(tooltip.text),
+  const translateSelectionWithinLimit = Boolean(
+    tooltip?.text && isReaderTranslateSelectionWithinLimit(tooltip.text),
   );
-  const canUseReaderAi =
+  const grammarSelectionWithinLimit = Boolean(
+    tooltip?.text && isReaderGrammarSelectionWithinLimit(tooltip.text),
+  );
+  const vocabSelectionWithinLimit = Boolean(
+    tooltip?.text && isReaderVocabSelectionWithinLimit(tooltip.text),
+  );
+  const canTranslate =
     Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
     Boolean(tooltip?.text) &&
-    selectionWithinLimit;
-  const readerAiDisabledTitle = !selectionWithinLimit
-    ? `Selection too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+    translateSelectionWithinLimit;
+  const canGrammar =
+    Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
+    Boolean(tooltip?.text) &&
+    grammarSelectionWithinLimit;
+  const translateDisabledTitle = !translateSelectionWithinLimit
+    ? `Selection too long for Translate (max ${MAX_READER_TRANSLATE_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+    : !targetLanguage.trim() || !nativeLanguage.trim()
+      ? "Add target and native language in Settings"
+      : undefined;
+  const grammarDisabledTitle = !grammarSelectionWithinLimit
+    ? `Selection too long for Grammar (max ${MAX_READER_GRAMMAR_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
     : !targetLanguage.trim() || !nativeLanguage.trim()
       ? "Add target and native language in Settings"
       : undefined;
   const canSaveToVocab =
-    selectionWithinLimit && savedVocab.length < 15;
+    vocabSelectionWithinLimit && savedVocab.length < 15;
 
   const handleTranslate = useCallback(async () => {
-    if (!tooltip?.text.trim() || !isReaderSelectionWithinLimit(tooltip.text)) return;
+    if (!tooltip?.text.trim() || !isReaderTranslateSelectionWithinLimit(tooltip.text))
+      return;
     setTranslateAnchor({
       centerX: tooltip.centerX,
       top: tooltip.top,
@@ -342,7 +362,8 @@ export function InteractiveStory({
   }, [story.body, tooltip]);
 
   const handleGrammar = useCallback(async () => {
-    if (!tooltip?.text.trim() || !isReaderSelectionWithinLimit(tooltip.text)) return;
+    if (!tooltip?.text.trim() || !isReaderGrammarSelectionWithinLimit(tooltip.text))
+      return;
     setTranslateAnchor({
       centerX: tooltip.centerX,
       top: tooltip.top,
@@ -598,8 +619,8 @@ export function InteractiveStory({
                     <div className={`${TOOLBAR_CLUSTER} gap-1.5`}>
                       <button
                         type="button"
-                        disabled={!canUseReaderAi}
-                        title={readerAiDisabledTitle ?? "Translate"}
+                        disabled={!canTranslate}
+                        title={translateDisabledTitle ?? "Translate"}
                         onPointerDown={(e) => e.preventDefault()}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -613,8 +634,8 @@ export function InteractiveStory({
                       <button
                         type="button"
                         title={
-                          !selectionWithinLimit
-                            ? `Selection too long (max ${MAX_READER_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+                          !vocabSelectionWithinLimit
+                            ? `Selection too long for Save (max ${MAX_READER_VOCAB_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
                             : savedVocab.length >= 15
                               ? "Saved vocab limit reached (15)"
                               : "Save to vocab list"
@@ -632,8 +653,8 @@ export function InteractiveStory({
                       </button>
                       <button
                         type="button"
-                        disabled={!canUseReaderAi}
-                        title={readerAiDisabledTitle ?? "Grammar explanation"}
+                        disabled={!canGrammar}
+                        title={grammarDisabledTitle ?? "Grammar explanation"}
                         onPointerDown={(e) => e.preventDefault()}
                         onClick={(e) => {
                           e.stopPropagation();

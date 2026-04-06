@@ -15,6 +15,12 @@ import {
 import { LogoutButton } from "../_components/LogoutButton";
 import { UpdatePasswordForm } from "../_components/UpdatePasswordForm";
 import { toHtmlDatasetValue } from "@/lib/app-theme";
+import {
+  getNativeLanguageSelectValue,
+  isNativeLanguagePreset,
+  NATIVE_LANGUAGE_OTHER_VALUE,
+  NATIVE_LANGUAGE_PRESETS,
+} from "@/lib/native-language-options";
 import { getSupabase } from "@/lib/supabase";
 import type {
   UserSettingsProfile,
@@ -40,6 +46,9 @@ const DIFFICULTY_OPTIONS = [
 ] as const;
 
 const MAX_TOPICS = 100;
+const MAX_USERNAME_LENGTH = 99;
+const MAX_TOPIC_NAME_LENGTH = 200;
+const MAX_NATIVE_LANGUAGE_CUSTOM_LENGTH = 99;
 
 const settingsHeaderFabClass =
   "mt-0.5 inline-flex shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 disabled:cursor-not-allowed disabled:opacity-60 sm:mt-0";
@@ -77,7 +86,8 @@ type SavedBaseline = {
 type PendingLeave =
   | { kind: "href"; href: string }
   | { kind: "logout" }
-  | { kind: "back" };
+  | { kind: "back" }
+  | { kind: "tab"; tab: SettingsTabId };
 
 function cloneBaseline(
   user: UserSettingsProfile,
@@ -267,14 +277,6 @@ export function UserSettingsClient({
     [router, searchParams],
   );
 
-  const selectTab = useCallback(
-    (id: SettingsTabId) => {
-      setActiveTab(id);
-      syncTabToUrl(id);
-    },
-    [syncTabToUrl],
-  );
-
   const tabParam = searchParams.get("tab");
   useEffect(() => {
     const next = parseSettingsTab(tabParam);
@@ -310,6 +312,19 @@ export function UserSettingsClient({
     savedBaseline,
   ]);
 
+  const selectTab = useCallback(
+    (id: SettingsTabId) => {
+      if (id === activeTab) return;
+      if (isDirty) {
+        setPendingLeave({ kind: "tab", tab: id });
+        return;
+      }
+      setActiveTab(id);
+      syncTabToUrl(id);
+    },
+    [activeTab, isDirty, syncTabToUrl],
+  );
+
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
 
@@ -339,11 +354,16 @@ export function UserSettingsClient({
         window.history.go(-2);
         return;
       }
+      if (target.kind === "tab") {
+        setActiveTab(target.tab);
+        syncTabToUrl(target.tab);
+        return;
+      }
       await getSupabase().auth.signOut();
       router.push("/login");
       router.refresh();
     },
-    [router],
+    [router, syncTabToUrl],
   );
 
   useEffect(() => {
@@ -423,7 +443,7 @@ export function UserSettingsClient({
 
   const handleAddTopic = () => {
     if (atTopicLimit) return;
-    const trimmed = newTopicName.trim();
+    const trimmed = newTopicName.trim().slice(0, MAX_TOPIC_NAME_LENGTH);
     if (!trimmed) return;
     setNewTopics((prev) => [
       ...prev,
@@ -437,9 +457,10 @@ export function UserSettingsClient({
   };
 
   const handleNewTopicNameChange = (clientKey: string, name: string) => {
+    const capped = name.slice(0, MAX_TOPIC_NAME_LENGTH);
     setNewTopics((prev) =>
       prev.map((t) =>
-        t.clientKey === clientKey ? { ...t, topic_name: name } : t,
+        t.clientKey === clientKey ? { ...t, topic_name: capped } : t,
       ),
     );
   };
@@ -653,8 +674,12 @@ export function UserSettingsClient({
                   type="text"
                   value={user.username}
                   onChange={(e) =>
-                    handleUserChange("username", e.target.value)
+                    handleUserChange(
+                      "username",
+                      e.target.value.slice(0, MAX_USERNAME_LENGTH),
+                    )
                   }
+                  maxLength={MAX_USERNAME_LENGTH}
                   className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
                   placeholder="Your username"
                 />
@@ -663,15 +688,53 @@ export function UserSettingsClient({
                 <label className="text-xs font-medium text-[var(--prose-text)]">
                   Native language
                 </label>
-                <input
-                  type="text"
-                  value={user.native_language}
-                  onChange={(e) =>
-                    handleUserChange("native_language", e.target.value)
-                  }
-                  className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
-                  placeholder="e.g. English"
-                />
+                <select
+                  value={getNativeLanguageSelectValue(user.native_language)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") {
+                      handleUserChange("native_language", "");
+                      return;
+                    }
+                    if (v === NATIVE_LANGUAGE_OTHER_VALUE) {
+                      if (isNativeLanguagePreset(user.native_language)) {
+                        handleUserChange("native_language", "");
+                      }
+                      return;
+                    }
+                    handleUserChange("native_language", v);
+                  }}
+                  className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                  aria-label="Native language preset"
+                >
+                  <option value="">Select language</option>
+                  {NATIVE_LANGUAGE_PRESETS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                  <option value={NATIVE_LANGUAGE_OTHER_VALUE}>Other…</option>
+                </select>
+                {getNativeLanguageSelectValue(user.native_language) ===
+                  NATIVE_LANGUAGE_OTHER_VALUE && (
+                  <input
+                    type="text"
+                    value={user.native_language}
+                    onChange={(e) =>
+                      handleUserChange(
+                        "native_language",
+                        e.target.value.slice(
+                          0,
+                          MAX_NATIVE_LANGUAGE_CUSTOM_LENGTH,
+                        ),
+                      )
+                    }
+                    maxLength={MAX_NATIVE_LANGUAGE_CUSTOM_LENGTH}
+                    className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                    placeholder="e.g. Welsh, Bengali"
+                    aria-label="Custom native language"
+                  />
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-[var(--prose-text)]">
@@ -870,14 +933,19 @@ export function UserSettingsClient({
               Topic-rotation
             </h2>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
-              With topic memory being per topic, it is recommended to write varying topics. If you write "German culture" and "A peculiar point about German culture", you are bound to get similar writing.
+              With topic memory being per topic, it is recommended to write varying topics. If you write ‘German culture’ and ‘A peculiar point about German culture’, you are bound to get similar writing.
             </p>
 
             <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-[var(--surface-elevated)] p-3 sm:flex-row">
               <input
                 type="text"
                 value={newTopicName}
-                onChange={(e) => setNewTopicName(e.target.value)}
+                onChange={(e) =>
+                  setNewTopicName(
+                    e.target.value.slice(0, MAX_TOPIC_NAME_LENGTH),
+                  )
+                }
+                maxLength={MAX_TOPIC_NAME_LENGTH}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -939,6 +1007,7 @@ export function UserSettingsClient({
                           onChange={(e) =>
                             handleNewTopicNameChange(topic.key, e.target.value)
                           }
+                          maxLength={MAX_TOPIC_NAME_LENGTH}
                           className="w-full min-w-0 rounded-xl border border-[var(--field-border)] bg-[var(--surface-panel-solid)] px-2 py-1 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0 sm:flex-1"
                         />
                         {promptCount != null && (
@@ -1143,7 +1212,9 @@ export function UserSettingsClient({
                   id="unsaved-changes-title"
                   className="text-center text-sm text-[var(--prose-text)]"
                 >
-                  You have unsaved changes. Leave this page without saving?
+                  {pendingLeave?.kind === "tab"
+                    ? "You have unsaved changes. Switch tabs without saving?"
+                    : "You have unsaved changes. Leave this page without saving?"}
                 </p>
                 <div className="mt-6 flex gap-3">
                   <button
@@ -1160,7 +1231,9 @@ export function UserSettingsClient({
                   >
                     {pendingLeave?.kind === "logout"
                       ? "Leave without saving"
-                      : "Leave page"}
+                      : pendingLeave?.kind === "tab"
+                        ? "Switch tab"
+                        : "Leave page"}
                   </button>
                 </div>
               </div>

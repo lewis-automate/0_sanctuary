@@ -195,7 +195,8 @@ export default async function SettingsPage({ searchParams }: PageProps) {
     for (const row of rows) {
       const raw = row[field];
       const trimmed = typeof raw === "string" ? raw.trim() : "";
-      const key = trimmed.length > 0 ? trimmed : "blank";
+      // Match UserSettingsClient promptCountForTopicName / tone (case-insensitive).
+      const key = trimmed.length > 0 ? trimmed.toLowerCase() : "blank";
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return [...map.entries()]

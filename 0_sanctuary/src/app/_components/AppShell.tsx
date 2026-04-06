@@ -14,6 +14,8 @@ type ShellInnerProps = PropsWithChildren<{
 function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
   const pathname = usePathname();
 
+  const practiceChat = pathname.startsWith("/writing/practice");
+
   const hideNav =
     pathname.startsWith("/login") ||
     pathname.startsWith("/reader") ||
@@ -34,13 +36,15 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
     ? immersiveVocab
       ? "pb-6 pt-[max(1rem,env(safe-area-inset-top))]"
       : "pb-10 pt-10"
-    : hasBottomTabStack
-      ? "pb-40 pt-10"
-      : "pb-28 pt-10";
+    : practiceChat
+      ? "pb-10 pt-10"
+      : hasBottomTabStack
+        ? "pb-40 pt-10"
+        : "pb-28 pt-10";
 
   return (
     <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
-      {!chromeHidden && !onMainSettingsHub ? (
+      {!chromeHidden && !onMainSettingsHub && !practiceChat ? (
         <Link
           href="/settings"
           className="fixed right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-[60] rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--nav-idle-text)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/20"
@@ -52,7 +56,7 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
       <main className={`mx-auto w-full max-w-md px-6 ${mainPadding}`}>
         {children}
       </main>
-      {chromeHidden ? null : <BottomNav />}
+      {chromeHidden || practiceChat ? null : <BottomNav />}
     </div>
   );
 }

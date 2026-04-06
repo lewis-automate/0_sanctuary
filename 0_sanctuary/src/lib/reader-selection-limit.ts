@@ -1,9 +1,14 @@
-/**
- * Max length for reader highlight actions (translate, grammar, save-to-vocab).
- * Grapheme-based so CJK (e.g. Korean syllables) counts fairly vs Latin letters.
- * ~One long sentence in English prose.
- */
-export const MAX_READER_SELECTION_GRAPHEMES = 200;
+/** Max highlight length for Translate action (graphemes). */
+export const MAX_READER_TRANSLATE_SELECTION_GRAPHEMES = 100;
+
+/** Max highlight length for Grammar action (graphemes). */
+export const MAX_READER_GRAMMAR_SELECTION_GRAPHEMES = 50;
+
+/** Max highlight length for Save-to-vocab action (graphemes). */
+export const MAX_READER_VOCAB_SELECTION_GRAPHEMES = 50;
+
+/** Surrounding passage sent to translate/grammar APIs; truncated by character (UTF-16 code units). */
+export const MAX_READER_CONTEXT_CHARS = 1250;
 
 export function countReaderSelectionGraphemes(text: string): number {
   const t = text.trim();
@@ -20,6 +25,23 @@ export function countReaderSelectionGraphemes(text: string): number {
   return [...t].length;
 }
 
-export function isReaderSelectionWithinLimit(text: string): boolean {
-  return countReaderSelectionGraphemes(text) <= MAX_READER_SELECTION_GRAPHEMES;
+export function isReaderTranslateSelectionWithinLimit(text: string): boolean {
+  return (
+    countReaderSelectionGraphemes(text) <=
+    MAX_READER_TRANSLATE_SELECTION_GRAPHEMES
+  );
+}
+
+export function isReaderGrammarSelectionWithinLimit(text: string): boolean {
+  return (
+    countReaderSelectionGraphemes(text) <=
+    MAX_READER_GRAMMAR_SELECTION_GRAPHEMES
+  );
+}
+
+export function isReaderVocabSelectionWithinLimit(text: string): boolean {
+  return (
+    countReaderSelectionGraphemes(text) <=
+    MAX_READER_VOCAB_SELECTION_GRAPHEMES
+  );
 }

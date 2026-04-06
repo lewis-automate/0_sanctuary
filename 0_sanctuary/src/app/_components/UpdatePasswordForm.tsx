@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 99;
+
 export function UpdatePasswordForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -15,8 +18,18 @@ export function UpdatePasswordForm() {
     e.preventDefault();
     setMessage(null);
 
-    if (password.length < 6) {
-      setMessage({ text: "Password must be at least 6 characters.", error: true });
+    if (password.length < PASSWORD_MIN) {
+      setMessage({
+        text: `Password must be at least ${PASSWORD_MIN} characters.`,
+        error: true,
+      });
+      return;
+    }
+    if (password.length > PASSWORD_MAX) {
+      setMessage({
+        text: `Password must be at most ${PASSWORD_MAX} characters.`,
+        error: true,
+      });
       return;
     }
     if (password !== confirmPassword) {
@@ -52,9 +65,10 @@ export function UpdatePasswordForm() {
           id="password"
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => setPassword(e.target.value.slice(0, PASSWORD_MAX))}
           required
-          minLength={6}
+          minLength={PASSWORD_MIN}
+          maxLength={PASSWORD_MAX}
           autoComplete="new-password"
           className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
           placeholder="••••••••"
@@ -71,9 +85,12 @@ export function UpdatePasswordForm() {
           id="confirmPassword"
           type="password"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={(e) =>
+            setConfirmPassword(e.target.value.slice(0, PASSWORD_MAX))
+          }
           required
-          minLength={6}
+          minLength={PASSWORD_MIN}
+          maxLength={PASSWORD_MAX}
           autoComplete="new-password"
           className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
           placeholder="••••••••"

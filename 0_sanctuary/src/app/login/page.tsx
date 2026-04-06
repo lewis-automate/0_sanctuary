@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabase";
 
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 99;
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -28,6 +31,20 @@ export default function LoginPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    if (password.length < PASSWORD_MIN) {
+      setMessage({
+        text: `Password must be at least ${PASSWORD_MIN} characters.`,
+        error: true,
+      });
+      return;
+    }
+    if (password.length > PASSWORD_MAX) {
+      setMessage({
+        text: `Password must be at most ${PASSWORD_MAX} characters.`,
+        error: true,
+      });
+      return;
+    }
     setLoading(true);
     const { error } = await getSupabase().auth.signUp({ email, password });
     setLoading(false);
@@ -88,8 +105,12 @@ export default function LoginPage() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) =>
+                setPassword(e.target.value.slice(0, PASSWORD_MAX))
+              }
               required
+              minLength={PASSWORD_MIN}
+              maxLength={PASSWORD_MAX}
               autoComplete="current-password"
               className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
               placeholder="••••••••"

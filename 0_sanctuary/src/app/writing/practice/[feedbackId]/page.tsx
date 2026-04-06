@@ -24,17 +24,22 @@ export default async function PracticeChatPage({ params }: PageProps) {
 
   const { data: fbRow } = await supabase
     .from("feedback")
-    .select("focus_point")
+    .select("raw_input, alternate_version, feedback, focus_point")
     .eq("id", feedbackId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const focusPoint =
-    fbRow?.focus_point == null ? null : String(fbRow.focus_point);
+  const studyItem = {
+    rawInput: fbRow?.raw_input == null ? "" : String(fbRow.raw_input),
+    alternateVersion:
+      fbRow?.alternate_version == null ? null : String(fbRow.alternate_version),
+    feedback: fbRow?.feedback == null ? null : String(fbRow.feedback),
+    focusPoint: fbRow?.focus_point == null ? null : String(fbRow.focus_point),
+  };
 
   return (
-    <FadeIn className="mx-auto w-full max-w-prose">
-      <PracticeChatClient feedbackId={feedbackId} focusPoint={focusPoint} />
+    <FadeIn className="mx-auto flex h-[calc(100dvh-5.5rem)] min-h-0 w-full max-w-5xl flex-col">
+      <PracticeChatClient feedbackId={feedbackId} studyItem={studyItem} />
     </FadeIn>
   );
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 const SELECT_FIELDS =
-  "id, vocab, example_sentences, definition, translation, last_used, mastery_score, frequency, date_added";
+  "id, vocab, example_sentences, definition, translation, last_used, mastery_score, frequency, date_added, archived";
 
 /** Up to 10 items: least-recently used first, then lowest mastery, then highest frequency, then oldest created. */
 export async function GET() {
@@ -21,6 +21,7 @@ export async function GET() {
     .from("study_items")
     .select(SELECT_FIELDS)
     .eq("user_id", user.id)
+    .or("archived.is.null,archived.eq.false")
     .order("last_used", { ascending: true, nullsFirst: true })
     .order("mastery_score", { ascending: true })
     .order("frequency", { ascending: false })

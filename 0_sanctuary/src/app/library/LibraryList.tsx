@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useActivityQueueProcessingTargets } from "@/lib/useActivityQueueProcessingTargets";
 import type { LibraryItem, LibrarySortKey } from "../_data/library";
 import { sortLibraryItems } from "../_data/library";
 
@@ -22,6 +23,7 @@ function formatDateYMD(iso: string | null): string {
 }
 
 export function LibraryList({ items: initialItems }: Props) {
+  const { progressStoryIds } = useActivityQueueProcessingTargets();
   const [sortKey, setSortKey] = useState<LibrarySortKey>("created");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [unreadOnly, setUnreadOnly] = useState(true);
@@ -100,9 +102,11 @@ export function LibraryList({ items: initialItems }: Props) {
         ) : (
           items.map((item) => {
             const hasReads = item.read_count > 0;
-            const cardClasses = hasReads
-              ? "relative block rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-panel)] p-5 shadow-sm transition-colors hover:bg-[var(--surface-elevated)]"
-              : "relative block rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-5 transition-colors hover:bg-[var(--surface-elevated)]";
+            const isProgressProcessing = progressStoryIds.has(item.uuid);
+            const cardClasses =
+              hasReads && !isProgressProcessing
+                ? "relative block rounded-3xl border border-[var(--border-strong)] bg-[var(--surface-panel)] p-5 shadow-sm transition-colors hover:bg-[var(--surface-elevated)]"
+                : "relative block rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-5 transition-colors hover:bg-[var(--surface-elevated)]";
 
             const titleClasses = "text-base font-semibold text-[var(--foreground)]";
 
@@ -114,7 +118,15 @@ export function LibraryList({ items: initialItems }: Props) {
                 href={`/reader?story=${item.uuid}`}
                 className={cardClasses}
               >
-                {hasReads && (
+                {isProgressProcessing ? (
+                  <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--text-muted)] opacity-90"
+                      aria-hidden
+                    />
+                    Processing
+                  </span>
+                ) : hasReads ? (
                   <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--semantic-success-text)]">
                     <span
                       className="h-1.5 w-1.5 rounded-full bg-[var(--semantic-success-icon)]"
@@ -122,7 +134,7 @@ export function LibraryList({ items: initialItems }: Props) {
                     />
                     Read
                   </span>
-                )}
+                ) : null}
                 <div className={titleClasses}>
                   {item.story_title}
                 </div>

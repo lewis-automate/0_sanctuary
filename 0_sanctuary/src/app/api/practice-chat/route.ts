@@ -6,7 +6,10 @@ import {
   formatFeedbackStudyBlock,
 } from "@/lib/practice-tutor-prompt";
 import { getUserLanguagePair } from "@/lib/user-languages";
-import { MAX_USER_PRACTICE_MESSAGES } from "@/lib/practice-user-message-limit";
+import {
+  MAX_USER_PRACTICE_CHARS,
+  MAX_USER_PRACTICE_MESSAGES,
+} from "@/lib/practice-user-message-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const MODEL = "gemini-2.5-flash";
@@ -73,6 +76,15 @@ export async function POST(request: Request) {
     }
     if (typeof m.content !== "string") {
       return NextResponse.json({ error: "Invalid message content" }, { status: 400 });
+    }
+    if (m.role === "user" && m.content.trim().length > MAX_USER_PRACTICE_CHARS) {
+      return NextResponse.json(
+        {
+          error: `Each message must be at most ${MAX_USER_PRACTICE_CHARS} characters.`,
+          code: "USER_MESSAGE_TOO_LONG",
+        },
+        { status: 400 },
+      );
     }
   }
 
