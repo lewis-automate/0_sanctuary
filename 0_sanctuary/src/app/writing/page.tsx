@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { FadeIn } from "../_components/FadeIn";
+import { PageLoading } from "../_components/PageLoading";
 import { WritingTabs } from "./WritingTabs";
 
 type PageProps = {
@@ -24,7 +25,7 @@ export default async function WritingPage({ searchParams }: PageProps) {
           Writing
         </p>
       </header>
-      <Suspense fallback={<div className="min-h-[40vh]" aria-hidden />}>
+      <Suspense fallback={<PageLoading />}>
         <WritingTabs initialTab={initialTab} />
       </Suspense>
     </FadeIn>

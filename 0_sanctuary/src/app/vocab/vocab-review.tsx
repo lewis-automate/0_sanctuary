@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronDown, ListChecks, Plus } from "lucide-react";
+import { Bookmark, ChevronDown, ListChecks } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -44,9 +44,8 @@ const SAVED_SORT_KEYS: SavedSortKey[] = [
 ];
 
 const vocabTabs = [
+  { id: "quick-review" as const, Icon: ListChecks, label: "Study" },
   { id: "saved" as const, Icon: Bookmark, label: "Saved" },
-  { id: "quick-review" as const, Icon: ListChecks, label: "Practice" },
-  { id: "add" as const, Icon: Plus, label: "Add" },
 ] as const;
 
 type TabId = (typeof vocabTabs)[number]["id"];
@@ -54,7 +53,7 @@ type TabId = (typeof vocabTabs)[number]["id"];
 /** Matches AppShell: hide tab bar, settings, and bottom nav during immersive practice. */
 const RAPID_REVIEW_FLOW = "rapid-review";
 
-/** Hub under the Practice tab: pick a mode, or show a mode’s session. */
+/** Hub under the Study tab: pick a mode, or show a mode’s session. */
 type ReviewHubMode = "choose" | "rapid-review";
 
 type VocabReviewProps = {
@@ -201,7 +200,7 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "add" || t === "saved" || t === "quick-review") {
+    if (t === "saved" || t === "quick-review") {
       setActiveTab(t);
     }
   }, [searchParams]);
@@ -470,52 +469,51 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
           </section>
         )}
 
-        {activeTab === "add" && (
-          <section aria-label="Add vocabulary">
-            <AddVocabScreen headingLevel={2} />
-          </section>
-        )}
-
         {activeTab === "quick-review" && (
           <section
-            aria-label="Practice"
+            aria-label="Study vocabulary"
             className="space-y-6 text-sm text-[var(--prose-text)]"
           >
             {reviewHubMode === "choose" ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
-                  onClick={enterImmersiveRapidReview}
-                  disabled={rapidReviewReportPending}
-                  className={[
-                    "inline-flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full border px-4 py-3 text-center shadow-sm transition-colors sm:min-w-[10rem] sm:flex-initial",
-                    rapidReviewReportPending
-                      ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] opacity-90"
-                      : "border-[var(--border-default)] bg-[var(--field-bg)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]",
-                  ].join(" ")}
-                >
-                  <span
-                    className={
+              <>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={enterImmersiveRapidReview}
+                    disabled={rapidReviewReportPending}
+                    className={[
+                      "inline-flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full border px-4 py-3 text-center shadow-sm transition-colors sm:min-w-[10rem] sm:flex-initial",
                       rapidReviewReportPending
-                        ? "text-sm font-medium text-[var(--field-placeholder)]"
-                        : "text-sm font-medium text-[var(--foreground)]"
-                    }
+                        ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] opacity-90"
+                        : "border-[var(--border-default)] bg-[var(--field-bg)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]",
+                    ].join(" ")}
                   >
-                    {rapidReviewReportPending ? "Processing…" : "Rapid review"}
-                  </span>
-                  <span
-                    className={
-                      rapidReviewReportPending
-                        ? "text-xs font-normal text-[var(--field-placeholder)]"
-                        : "text-xs font-normal text-[var(--text-muted)]"
-                    }
-                  >
-                    {rapidReviewReportPending
-                      ? "Last session is still syncing"
-                      : "Review up to 10 words"}
-                  </span>
-                </button>
-              </div>
+                    <span
+                      className={
+                        rapidReviewReportPending
+                          ? "text-sm font-medium text-[var(--field-placeholder)]"
+                          : "text-sm font-medium text-[var(--foreground)]"
+                      }
+                    >
+                      {rapidReviewReportPending ? "Processing…" : "Rapid review"}
+                    </span>
+                    <span
+                      className={
+                        rapidReviewReportPending
+                          ? "text-xs font-normal text-[var(--field-placeholder)]"
+                          : "text-xs font-normal text-[var(--text-muted)]"
+                      }
+                    >
+                      {rapidReviewReportPending
+                        ? "Last session is still syncing"
+                        : "Review up to 10 words"}
+                    </span>
+                  </button>
+                </div>
+                <div aria-label="Add vocabulary">
+                  <AddVocabScreen headingLevel={2} embedded />
+                </div>
+              </>
             ) : null}
             {reviewHubMode === "rapid-review" ? (
               <RapidReviewSession
@@ -528,7 +526,7 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
       </div>
 
       {!immersivePractice ? (
-        <SubNavTabBar ariaLabel="Saved, practice, and add">
+        <SubNavTabBar ariaLabel="Study and saved">
           {vocabTabs.map((tab) => {
             const isActive = tab.id === activeTab;
             const Icon = tab.Icon;

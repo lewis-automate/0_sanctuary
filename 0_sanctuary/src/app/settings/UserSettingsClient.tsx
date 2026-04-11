@@ -1,20 +1,35 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Moon, Sun } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Moon,
+  Sun,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { CANCEL_PENDING_NAVIGATION_EVENT } from "../_components/NavigationLoadingOverlay";
 import { LogoutButton } from "../_components/LogoutButton";
 import { UpdatePasswordForm } from "../_components/UpdatePasswordForm";
 import { toHtmlDatasetValue } from "@/lib/app-theme";
+import {
+  findDefaultTopicPresetInCategories,
+  getDefaultTopicCategoriesForUser,
+  getDefaultTopicPresetFullText,
+  type DefaultTopicCategory,
+} from "@/lib/default-topic-presets";
 import {
   getNativeLanguageSelectValue,
   isNativeLanguagePreset,
@@ -28,22 +43,16 @@ import type {
   UserSettingsSaveTrigger,
 } from "./actions";
 import { queueUserSettings } from "./actions";
+import { DIFFICULTY_OPTIONS } from "@/lib/difficulty-options";
 import {
   parseSettingsTab,
   SETTINGS_TABS,
   type SettingsTabId,
 } from "./settings-tabs";
 
-const DIFFICULTY_OPTIONS = [
-  "A1",
-  "A1/A2",
-  "A2",
-  "A2/B1",
-  "B1",
-  "B1/B2",
-  "B2",
-  "B2/C1",
-] as const;
+/** Bell-shaped easing — match create page “More options” */
+const TOPICS_ADVANCED_EASE = [0.83, 0, 0.17, 1] as const;
+const TOPICS_ADVANCED_MS = 0.78;
 
 const MAX_TOPICS = 100;
 const MAX_USERNAME_LENGTH = 99;
@@ -157,17 +166,24 @@ type PromptHistoryModalProps = {
   kind: PromptHistoryKind | null;
   rows: StoryGenUsageCount[];
   onClose: () => void;
+  onCopyTopicToField?: (topicKey: string) => void;
+  fieldFilledTopicKey?: string | null;
 };
 
-function PromptHistoryModal({ open, kind, rows, onClose }: PromptHistoryModalProps) {
+function PromptHistoryModal({
+  open,
+  kind,
+  rows,
+  onClose,
+  onCopyTopicToField,
+  fieldFilledTopicKey,
+}: PromptHistoryModalProps) {
   const title =
     kind === "topic"
       ? "Library history by topic"
       : kind === "tone"
         ? "Library history by tone"
         : "History";
-  const fieldLabel = kind === "topic" ? "prompt_topic" : kind === "tone" ? "prompt_tone" : "";
-
   return (
     <AnimatePresence>
       {open && kind && (
@@ -205,19 +221,45 @@ function PromptHistoryModal({ open, kind, rows, onClose }: PromptHistoryModalPro
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
               <ul className="space-y-2 text-sm" role="list">
-                {rows.map((row) => (
-                  <li
-                    key={row.key}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2"
-                  >
-                    <span className="min-w-0 flex-1 break-words text-[var(--foreground)]">
-                      {row.key}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-xs text-[var(--text-muted)]">
-                      ×{row.count}
-                    </span>
-                  </li>
-                ))}
+                {rows.map((row) => {
+                  const filled = fieldFilledTopicKey === row.key;
+                  const showCopy =
+                    kind === "topic" && typeof onCopyTopicToField === "function";
+                  return (
+                    <li
+                      key={row.key}
+                      className="flex flex-wrap items-start justify-between gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2"
+                    >
+                      <span className="min-w-0 flex-1 break-words text-[var(--foreground)]">
+                        {row.key}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="tabular-nums text-xs text-[var(--text-muted)]">
+                          ×{row.count}
+                        </span>
+                        {showCopy ? (
+                          <button
+                            type="button"
+                            onClick={() => onCopyTopicToField(row.key)}
+                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 text-[11px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)] sm:text-xs"
+                          >
+                            {filled ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" aria-hidden />
+                                Filled
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" aria-hidden />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             <div className="shrink-0 border-t border-[var(--border-default)] p-4">
@@ -229,6 +271,295 @@ function PromptHistoryModal({ open, kind, rows, onClose }: PromptHistoryModalPro
                 Close
               </button>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+type DefaultTopicPresetsModalProps = {
+  open: boolean;
+  onClose: () => void;
+  onClearSelection: () => void;
+  categories: readonly DefaultTopicCategory[];
+  selectedPresetIds: readonly string[];
+  onSelectPreset: (id: string) => void;
+  fieldFilledPresetId: string | null;
+  onFillTopicField: (id: string) => void;
+  onAddSelected: () => void;
+  addSelectedDisabled: boolean;
+  addSelectedTitle: string;
+};
+
+function DefaultTopicPresetsModal({
+  open,
+  onClose,
+  onClearSelection,
+  categories,
+  selectedPresetIds,
+  onSelectPreset,
+  fieldFilledPresetId,
+  onFillTopicField,
+  onAddSelected,
+  addSelectedDisabled,
+  addSelectedTitle,
+}: DefaultTopicPresetsModalProps) {
+  const [expandedPresetId, setExpandedPresetId] = useState<string | null>(
+    null,
+  );
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setExpandedPresetId(null);
+      setCloseConfirmOpen(false);
+    }
+  }, [open]);
+
+  const selectedCount = selectedPresetIds.length;
+
+  const requestClose = () => {
+    if (selectedCount > 0) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="default-topic-presets-modal"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[55] flex items-center justify-center p-6"
+          data-unsaved-ignore
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+            aria-label="Dismiss"
+            onClick={requestClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.15 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="default-topic-presets-title"
+            className="relative flex max-h-[min(92vh,48rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] shadow-xl"
+          >
+            <div className="shrink-0 border-b border-[var(--border-default)] px-5 py-4">
+              <h2
+                id="default-topic-presets-title"
+                className="text-base font-semibold text-[var(--foreground)]"
+              >
+                Pick a default topic
+              </h2>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Copy replaces the add-topic field. Add selected appends the full line
+                for each chosen preset to your list as active.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-3">
+              {categories.map((category) => (
+                <div key={category.id} className="space-y-2">
+                  <h3 className="text-xs font-semibold leading-snug text-[var(--text-muted)]">
+                    {category.heading}
+                  </h3>
+                  <div className="space-y-2">
+                    {category.presets.map((preset) => {
+                      const selected = selectedPresetIds.includes(preset.id);
+                      const filled = fieldFilledPresetId === preset.id;
+                      const expanded = expandedPresetId === preset.id;
+                      return (
+                        <div
+                          key={preset.id}
+                          className={`overflow-hidden rounded-xl border transition-[border-color,box-shadow] duration-200 ${
+                            selected
+                              ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)]/[0.08] shadow-[inset_0_0_0_1px_var(--nav-active-bg)]"
+                              : "border-[var(--border-default)] bg-[var(--field-bg)]"
+                          }`}
+                        >
+                          <div className="flex min-h-[2.75rem] items-center gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3">
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-[var(--foreground)]">
+                              {preset.title}
+                            </span>
+                            <button
+                              type="button"
+                              aria-expanded={expanded}
+                              aria-controls={`default-preset-detail-${preset.id}`}
+                              id={`default-preset-expand-${preset.id}`}
+                              onClick={() =>
+                                setExpandedPresetId((cur) =>
+                                  cur === preset.id ? null : preset.id,
+                                )
+                              }
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+                              title={expanded ? "Hide details" : "Show details"}
+                            >
+                              <motion.span
+                                initial={false}
+                                animate={{ rotate: expanded ? 180 : 0 }}
+                                transition={{
+                                  duration: 0.28,
+                                  ease: [0.83, 0, 0.17, 1],
+                                }}
+                              >
+                                <ChevronDown className="h-4 w-4" aria-hidden />
+                              </motion.span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onFillTopicField(preset.id)}
+                              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-elevated)] px-2.5 text-[11px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)] sm:px-3 sm:text-xs"
+                            >
+                              {filled ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" aria-hidden />
+                                  Filled
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" aria-hidden />
+                                  Copy
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => onSelectPreset(preset.id)}
+                              className={`inline-flex h-8 shrink-0 items-center gap-0.5 rounded-lg border px-2.5 text-[11px] font-semibold transition-colors sm:px-3 sm:text-xs ${
+                                selected
+                                  ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                                  : "border-[var(--border-strong)] bg-[var(--surface-elevated)] text-[var(--foreground)] hover:bg-[var(--nav-hover-bg)]"
+                              }`}
+                            >
+                              {selected ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5" aria-hidden />
+                                  <span className="hidden sm:inline">
+                                    Selected
+                                  </span>
+                                </>
+                              ) : (
+                                "Select"
+                              )}
+                            </button>
+                          </div>
+                          <div
+                            id={`default-preset-detail-${preset.id}`}
+                            role="region"
+                            aria-labelledby={`default-preset-detail-title-${preset.id}`}
+                            className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.83,0,0.17,1)] ${
+                              expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                            }`}
+                          >
+                            <div className="min-h-0 overflow-hidden border-t border-[var(--border-default)]/80">
+                              <p
+                                id={`default-preset-detail-title-${preset.id}`}
+                                className="px-3 pt-2.5 text-sm font-medium leading-snug text-[var(--foreground)]"
+                              >
+                                {preset.title}
+                              </p>
+                              <p className="px-3 pb-3 pt-1.5 text-xs leading-relaxed text-[var(--text-muted)]">
+                                {preset.body}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="shrink-0 border-t border-[var(--border-default)] bg-[var(--surface-panel-solid)] shadow-[0_-6px_20px_rgba(0,0,0,0.06)]">
+              {selectedCount > 0 ? (
+                <div className="px-4 pb-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={onAddSelected}
+                    disabled={addSelectedDisabled}
+                    title={addSelectedTitle}
+                    className="w-full rounded-2xl border border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Add selected ({selectedCount})
+                  </button>
+                </div>
+              ) : null}
+              <div className="px-4 pb-4 pt-2">
+                <button
+                  type="button"
+                  onClick={requestClose}
+                  className="w-full rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {closeConfirmOpen ? (
+              <div
+                className="absolute inset-0 z-[60] flex items-center justify-center rounded-3xl bg-black/35 p-4 backdrop-blur-[2px]"
+                data-unsaved-ignore
+              >
+                <div
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-labelledby="default-presets-close-confirm-title"
+                  className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel-solid)] p-5 shadow-xl"
+                >
+                  <p
+                    id="default-presets-close-confirm-title"
+                    className="text-center text-sm text-[var(--prose-text)]"
+                  >
+                    You have {selectedCount === 1 ? "a topic" : `${selectedCount} topics`}{" "}
+                    selected but {selectedCount === 1 ? "it isn't" : "they aren't"} added to your
+                    list yet. Add {selectedCount === 1 ? "it" : "them"} now, stay in this window,
+                    or close without adding?
+                  </p>
+                  <div className="mt-5 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAddSelected();
+                        setCloseConfirmOpen(false);
+                      }}
+                      disabled={addSelectedDisabled}
+                      title={addSelectedTitle}
+                      className="w-full rounded-2xl border border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Add selected ({selectedCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCloseConfirmOpen(false)}
+                      className="w-full rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
+                    >
+                      Stay
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClearSelection();
+                        setCloseConfirmOpen(false);
+                        onClose();
+                      }}
+                      className="w-full rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--semantic-danger-inline)] transition-colors hover:bg-[var(--semantic-danger-hover)]"
+                    >
+                      Close without adding
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </motion.div>
         </motion.div>
       )}
@@ -268,6 +599,87 @@ export function UserSettingsClient({
   const [promptHistoryOpen, setPromptHistoryOpen] = useState<
     PromptHistoryKind | null
   >(null);
+  const [topicsAdvancedOpen, setTopicsAdvancedOpen] = useState(false);
+  const [defaultTopicPresetsOpen, setDefaultTopicPresetsOpen] = useState(false);
+  const [defaultTopicPresetSelectedIds, setDefaultTopicPresetSelectedIds] =
+    useState<string[]>([]);
+  const [defaultTopicFieldFilledPresetId, setDefaultTopicFieldFilledPresetId] =
+    useState<string | null>(null);
+  const [promptHistoryFilledTopicKey, setPromptHistoryFilledTopicKey] =
+    useState<string | null>(null);
+  const newTopicTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const shouldReduceMotion = useReducedMotion();
+
+  const defaultTopicCategories = useMemo(
+    () =>
+      getDefaultTopicCategoriesForUser(user.target_language, user.native_language),
+    [user.target_language, user.native_language],
+  );
+
+  const syncNewTopicTextareaHeight = useCallback(() => {
+    const el = newTopicTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const cap = Math.min(window.innerHeight * 0.5, 14 * 16);
+    const next = Math.min(el.scrollHeight, cap);
+    el.style.height = `${Math.max(next, 2.75 * 16)}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncNewTopicTextareaHeight();
+  }, [newTopicName, syncNewTopicTextareaHeight]);
+
+  useEffect(() => {
+    if (!defaultTopicPresetsOpen) {
+      setDefaultTopicPresetSelectedIds([]);
+      setDefaultTopicFieldFilledPresetId(null);
+    }
+  }, [defaultTopicPresetsOpen]);
+
+  useEffect(() => {
+    if (promptHistoryOpen === null) {
+      setPromptHistoryFilledTopicKey(null);
+    }
+  }, [promptHistoryOpen]);
+
+  /** Copy from Pick default / Past Topics: replace entire topic field (capped at max length). */
+  const pasteTopicTextIntoField = useCallback((incomingFull: string) => {
+    setNewTopicName(incomingFull.slice(0, MAX_TOPIC_NAME_LENGTH));
+  }, []);
+
+  const handleFillTopicFieldFromPreset = useCallback(
+    (id: string) => {
+      const preset = findDefaultTopicPresetInCategories(
+        id,
+        defaultTopicCategories,
+      );
+      if (!preset) return;
+      const text = getDefaultTopicPresetFullText(
+        preset,
+        MAX_TOPIC_NAME_LENGTH,
+      );
+      pasteTopicTextIntoField(text);
+      setDefaultTopicFieldFilledPresetId(id);
+      window.setTimeout(() => {
+        setDefaultTopicFieldFilledPresetId((cur) => (cur === id ? null : cur));
+      }, 2000);
+    },
+    [defaultTopicCategories, pasteTopicTextIntoField],
+  );
+
+  const handleCopyTopicFromHistory = useCallback(
+    (topicKey: string) => {
+      pasteTopicTextIntoField(topicKey);
+      setPromptHistoryFilledTopicKey(topicKey);
+      window.setTimeout(() => {
+        setPromptHistoryFilledTopicKey((cur) =>
+          cur === topicKey ? null : cur,
+        );
+      }, 2000);
+    },
+    [pasteTopicTextIntoField],
+  );
+
   const syncTabToUrl = useCallback(
     (id: SettingsTabId) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -285,6 +697,51 @@ export function UserSettingsClient({
 
   const topicSlotsUsed = existingTopics.length + newTopics.length;
   const atTopicLimit = topicSlotsUsed >= MAX_TOPICS;
+  const topicSlotsRemaining = MAX_TOPICS - topicSlotsUsed;
+
+  const defaultTopicAddSelectedDisabled =
+    defaultTopicPresetSelectedIds.length === 0 ||
+    topicSlotsRemaining <= 0 ||
+    defaultTopicPresetSelectedIds.length > topicSlotsRemaining;
+
+  const defaultTopicAddSelectedTitle = (() => {
+    if (topicSlotsRemaining <= 0) return "Topic limit reached";
+    if (defaultTopicPresetSelectedIds.length === 0)
+      return "Select one or more presets";
+    if (defaultTopicPresetSelectedIds.length > topicSlotsRemaining) {
+      const n = topicSlotsRemaining;
+      return `Only ${n} slot${n === 1 ? "" : "s"} left—deselect some topics or save first.`;
+    }
+    return "Add the full title and description for each selection to your topics";
+  })();
+
+  const handleAddSelectedDefaultTopic = useCallback(() => {
+    if (defaultTopicPresetSelectedIds.length === 0 || topicSlotsRemaining <= 0)
+      return;
+    if (defaultTopicPresetSelectedIds.length > topicSlotsRemaining) return;
+
+    const rows: NewTopic[] = [];
+    for (const id of defaultTopicPresetSelectedIds) {
+      const preset = findDefaultTopicPresetInCategories(
+        id,
+        defaultTopicCategories,
+      );
+      if (!preset) continue;
+      const full = getDefaultTopicPresetFullText(preset, MAX_TOPIC_NAME_LENGTH);
+      rows.push({
+        clientKey: crypto.randomUUID(),
+        topic_name: full,
+        active: true,
+      });
+    }
+    if (rows.length === 0) return;
+    setNewTopics((prev) => [...prev, ...rows]);
+    setDefaultTopicPresetsOpen(false);
+  }, [
+    defaultTopicPresetSelectedIds,
+    defaultTopicCategories,
+    topicSlotsRemaining,
+  ]);
 
   const toneLibraryMatchCount = useMemo(
     () => promptCountForToneText(user.preferred_tone, storyGenToneUsage),
@@ -311,6 +768,19 @@ export function UserSettingsClient({
     deletedIds,
     savedBaseline,
   ]);
+
+  const topicsDirty = useMemo(() => {
+    if (
+      JSON.stringify(existingTopics) !==
+      JSON.stringify(savedBaseline.existingTopics)
+    )
+      return true;
+    if (JSON.stringify(newTopics) !== JSON.stringify(savedBaseline.newTopics))
+      return true;
+    if (JSON.stringify(deletedIds) !== JSON.stringify(savedBaseline.deletedIds))
+      return true;
+    return false;
+  }, [existingTopics, newTopics, deletedIds, savedBaseline]);
 
   const selectTab = useCallback(
     (id: SettingsTabId) => {
@@ -526,7 +996,7 @@ export function UserSettingsClient({
     }
   };
 
-  const handleSaveAll = async () => {
+  const performSaveAll = useCallback(async (): Promise<boolean> => {
     setSaving(true);
     setSaveError(null);
     setSaveSuccess(false);
@@ -555,12 +1025,35 @@ export function UserSettingsClient({
       setSavedBaseline(cloneBaseline(user, existingTopics, newTopics, []));
       setDeletedIds([]);
       setSaveSuccess(true);
+      return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save");
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, existingTopics, newTopics, deletedIds, activeTab]);
+
+  const handleSaveAll = useCallback(() => {
+    void performSaveAll();
+  }, [performSaveAll]);
+
+  const handleSaveAndContinueLeave = useCallback(async () => {
+    if (!pendingLeave) return;
+    const target = pendingLeave;
+    const ok = await performSaveAll();
+    if (!ok) {
+      window.dispatchEvent(new CustomEvent(CANCEL_PENDING_NAVIGATION_EVENT));
+      return;
+    }
+    await tryLeave(target);
+  }, [pendingLeave, performSaveAll, tryLeave]);
+
+  /** Clears unsaved dialog and the global nav loading blur (set when a link was clicked). */
+  const dismissPendingLeaveDialog = useCallback(() => {
+    setPendingLeave(null);
+    window.dispatchEvent(new CustomEvent(CANCEL_PENDING_NAVIGATION_EVENT));
+  }, []);
 
   const allTopicsForDisplay = [
     ...existingTopics.map((t) => ({
@@ -868,14 +1361,158 @@ export function UserSettingsClient({
         className={activeTab === "topics" ? "" : "hidden"}
       >
         <div className="flex flex-col gap-6">
-          <p className="mt-1 text-xs text-[var(--text-muted)]">What do you want to read about?
-
+          <p className="mt-1 text-center text-xs italic text-[var(--text-muted)]">
+            What do you want to read about?
           </p>
+
+          <section className={panelClass}>
+            <h2 className="text-base font-semibold text-[var(--foreground)]">
+              Topic-rotation
+            </h2>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Active topics will be picked randomly each time when generating new reading material.
+            </p>
+
+            <div className="mt-4 flex min-w-0 flex-col gap-3 rounded-2xl bg-[var(--surface-elevated)] p-3">
+              <button
+                type="button"
+                onClick={() => setDefaultTopicPresetsOpen(true)}
+                className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 text-sm font-semibold leading-none text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90"
+              >
+                Pick default
+              </button>
+
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+                <textarea
+                  ref={newTopicTextareaRef}
+                  value={newTopicName}
+                  onChange={(e) =>
+                    setNewTopicName(
+                      e.target.value.slice(0, MAX_TOPIC_NAME_LENGTH),
+                    )
+                  }
+                  maxLength={MAX_TOPIC_NAME_LENGTH}
+                  rows={2}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddTopic();
+                    }
+                  }}
+                  className="max-h-[min(50vh,14rem)] min-h-[2.75rem] w-full min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto break-words rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm leading-snug text-[var(--field-text)] [overflow-wrap:anywhere] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                  placeholder="Add a new topic (e.g. history, travel, science)…"
+                  disabled={atTopicLimit}
+                  aria-describedby={`${tabPanelId}-topic-char-hint`}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTopic}
+                  className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 text-sm font-semibold leading-none text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:opacity-50 sm:w-auto sm:min-w-[5.5rem]"
+                  disabled={!newTopicName.trim() || atTopicLimit}
+                >
+                  Add
+                </button>
+              </div>
+
+              <p
+                id={`${tabPanelId}-topic-char-hint`}
+                className="text-right text-[11px] tabular-nums leading-none text-[var(--text-muted)]"
+              >
+                {newTopicName.length} / {MAX_TOPIC_NAME_LENGTH} characters
+              </p>
+            </div>
+
+            <div className="mt-3">
+              {allTopicsForDisplay.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2.5 text-center text-xs text-[var(--text-muted)]">
+                  No topics yet. Add a few to guide story prompts.
+                </p>
+              ) : (
+                <ul
+                  className="max-h-[min(52vh,30rem)] divide-y divide-[var(--border-default)] overflow-y-auto overscroll-contain rounded-xl border border-[var(--border-default)] bg-[var(--field-bg)]"
+                  aria-label="Topics list"
+                >
+                  {allTopicsForDisplay.map((topic) => {
+                    const promptCount = promptCountForTopicName(
+                      topic.topic_name,
+                      storyGenTopicUsage,
+                    );
+                    return (
+                      <li
+                        key={topic.key}
+                        className="flex flex-col gap-1.5 px-3 py-2.5 first:pt-3 last:pb-3"
+                      >
+                        {topic.isExisting ? (
+                          <p className="line-clamp-3 min-w-0 text-sm leading-snug text-[var(--foreground)]">
+                            {topic.topic_name || (
+                              <span className="text-[var(--field-placeholder)]">
+                                (empty)
+                              </span>
+                            )}
+                          </p>
+                        ) : (
+                          <input
+                            type="text"
+                            value={topic.topic_name}
+                            onChange={(e) =>
+                              handleNewTopicNameChange(topic.key, e.target.value)
+                            }
+                            maxLength={MAX_TOPIC_NAME_LENGTH}
+                            className="w-full min-w-0 rounded-lg border border-[var(--field-border)] bg-[var(--surface-panel-solid)] px-2 py-1.5 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                          />
+                        )}
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--text-muted)]">
+                            <label className="flex cursor-pointer items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                checked={topic.active}
+                                onChange={() => handleTopicToggle(topic.key)}
+                                className="h-3 w-3 shrink-0 rounded border-[var(--border-strong)] text-[var(--nav-active-bg)] accent-[var(--nav-active-bg)] focus:ring-0"
+                              />
+                              <span>Active</span>
+                            </label>
+                            {promptCount != null && (
+                              <>
+                                <span
+                                  className="text-[var(--border-default)]"
+                                  aria-hidden
+                                >
+                                  ·
+                                </span>
+                                <span className="tabular-nums">
+                                  {promptCount}{" "}
+                                  {promptCount === 1 ? "story" : "stories"} in
+                                  library
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTopicPendingDeleteKey(topic.key)}
+                            className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium text-[var(--semantic-danger-inline)] transition-colors hover:bg-[var(--semantic-danger-hover)]"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </section>
+
           {storyGenTopicUsage.length > 0 && (
             <section className={panelClass}>
               <h2 className="text-base font-semibold text-[var(--foreground)]">
                 Past Topics
               </h2>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                topics used in the past
+              </p>
               <button
                 type="button"
                 onClick={() => setPromptHistoryOpen("topic")}
@@ -892,157 +1529,104 @@ export function UserSettingsClient({
             </section>
           )}
 
-          <section className={panelClass}>
-            <h2
-              id="topic-memory-section-title"
-              className="text-base font-semibold text-[var(--foreground)]"
+          <div className="border-t border-[var(--border-default)] pt-2">
+            <button
+              type="button"
+              id="settings-topics-advanced-label"
+              aria-expanded={topicsAdvancedOpen}
+              aria-controls="settings-topics-advanced-panel"
+              onClick={() => setTopicsAdvancedOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-4 py-3 text-left text-sm font-medium text-[var(--foreground)] transition-colors duration-500 ease-[cubic-bezier(0.83,0,0.17,1)] hover:bg-[var(--surface-elevated)]"
             >
-              Topic memory
-            </h2>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              The number of written passages to keep in mind when creating new ones. This is used to avoid repeating the same topics.
-            </p>
-            <input
-              id="last_stories_filter"
-              name="last_stories_filter"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={2}
-              value={user.last_stories_filter ?? ""}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
-                if (digits === "") {
-                  handleUserChange("last_stories_filter", null);
-                  return;
-                }
-                const n = parseInt(digits, 10);
-                handleUserChange(
-                  "last_stories_filter",
-                  n > 99 ? 99 : n,
-                );
-              }}
-              aria-labelledby="topic-memory-section-title"
-              className="mt-4 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
-              placeholder="0–99"
-            />
-          </section>
-
-          <section className={panelClass}>
-            <h2 className="text-base font-semibold text-[var(--foreground)]">
-              Topic-rotation
-            </h2>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              With topic memory being per topic, it is recommended to write varying topics. If you write ‘German culture’ and ‘A peculiar point about German culture’, you are bound to get similar writing.
-            </p>
-
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-[var(--surface-elevated)] p-3 sm:flex-row">
-              <input
-                type="text"
-                value={newTopicName}
-                onChange={(e) =>
-                  setNewTopicName(
-                    e.target.value.slice(0, MAX_TOPIC_NAME_LENGTH),
-                  )
-                }
-                maxLength={MAX_TOPIC_NAME_LENGTH}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddTopic();
-                  }
+              <span>Advanced options</span>
+              <motion.span
+                className="inline-block text-[var(--text-muted)]"
+                aria-hidden
+                initial={false}
+                animate={{
+                  rotate: topicsAdvancedOpen ? 180 : 0,
                 }}
-                className="flex-1 rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
-                placeholder="Add a new topic (e.g. history, travel, science)…"
-                disabled={atTopicLimit}
-              />
-              <button
-                type="button"
-                onClick={handleAddTopic}
-                className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:opacity-50"
-                disabled={!newTopicName.trim() || atTopicLimit}
+                transition={
+                  shouldReduceMotion
+                    ? { duration: 0.15 }
+                    : {
+                        duration: TOPICS_ADVANCED_MS,
+                        ease: TOPICS_ADVANCED_EASE,
+                      }
+                }
               >
-                Add
-              </button>
-            </div>
+                ▾
+              </motion.span>
+            </button>
 
-            <ul className="mt-4 space-y-2">
-              {allTopicsForDisplay.length === 0 && (
-                <li className="rounded-2xl border border-dashed border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2 text-xs text-[var(--text-muted)]">
-                  No topics yet. Add a few to guide story prompts.
-                </li>
-              )}
-
-              {allTopicsForDisplay.map((topic) => {
-                const promptCount = promptCountForTopicName(
-                  topic.topic_name,
-                  storyGenTopicUsage,
-                );
-                return (
-                  <li
-                    key={topic.key}
-                    className="flex flex-col gap-2 rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] sm:flex-row sm:items-start sm:gap-3"
-                  >
-                    {topic.isExisting ? (
-                      <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="w-full min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1.5 text-sm text-[var(--foreground)]">
-                          {topic.topic_name || (
-                            <span className="text-[var(--field-placeholder)]">
-                              (empty)
-                            </span>
-                          )}
-                        </p>
-                        {promptCount != null && (
-                          <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
-                            {promptCount} stor
-                            {promptCount === 1 ? "y" : "ies"} in library
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex w-full min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                        <input
-                          type="text"
-                          value={topic.topic_name}
-                          onChange={(e) =>
-                            handleNewTopicNameChange(topic.key, e.target.value)
-                          }
-                          maxLength={MAX_TOPIC_NAME_LENGTH}
-                          className="w-full min-w-0 rounded-xl border border-[var(--field-border)] bg-[var(--surface-panel-solid)] px-2 py-1 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0 sm:flex-1"
-                        />
-                        {promptCount != null && (
-                          <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
-                            {promptCount} stor
-                            {promptCount === 1 ? "y" : "ies"} in library
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex shrink-0 flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-                        <input
-                          type="checkbox"
-                          checked={topic.active}
-                          onChange={() => handleTopicToggle(topic.key)}
-                          className="h-3.5 w-3.5 rounded border-[var(--border-strong)] text-[var(--nav-active-bg)] accent-[var(--nav-active-bg)] focus:ring-0"
-                        />
-                        <span>Active</span>
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => setTopicPendingDeleteKey(topic.key)}
-                        className="rounded-full border border-[var(--semantic-danger-soft-border)] px-3 py-1 text-xs font-medium text-[var(--semantic-danger-inline)] transition-colors hover:border-[var(--semantic-danger-border)] hover:bg-[var(--semantic-danger-hover)]"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+            <motion.div
+              id="settings-topics-advanced-panel"
+              role="region"
+              aria-labelledby="settings-topics-advanced-label"
+              aria-hidden={!topicsAdvancedOpen}
+              initial={false}
+              inert={!topicsAdvancedOpen ? true : undefined}
+              animate={
+                shouldReduceMotion
+                  ? {
+                      maxHeight: topicsAdvancedOpen ? 800 : 0,
+                      opacity: topicsAdvancedOpen ? 1 : 0,
+                      marginTop: topicsAdvancedOpen ? 16 : 0,
+                    }
+                  : {
+                      maxHeight: topicsAdvancedOpen ? 800 : 0,
+                      opacity: topicsAdvancedOpen ? 1 : 0,
+                      marginTop: topicsAdvancedOpen ? 16 : 0,
+                      y: topicsAdvancedOpen ? 0 : -10,
+                    }
+              }
+              transition={
+                shouldReduceMotion
+                  ? { duration: 0.18, ease: "easeOut" }
+                  : {
+                      duration: TOPICS_ADVANCED_MS,
+                      ease: TOPICS_ADVANCED_EASE,
+                    }
+              }
+              className="overflow-hidden"
+            >
+              <section className={panelClass}>
+                <h2
+                  id="topic-memory-section-title"
+                  className="text-base font-semibold text-[var(--foreground)]"
+                >
+                  Topic memory
+                </h2>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  To avoid recreating the same passages over and over, we take into account a number of written passages for each topic. This is topic-specific, so it recommended to not have topics that are too similar.  Even "Culture" and "cultures" will both track written passages separately.
+                </p>
+                <input
+                  id="last_stories_filter"
+                  name="last_stories_filter"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
+                  value={user.last_stories_filter ?? ""}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
+                    if (digits === "") {
+                      handleUserChange("last_stories_filter", null);
+                      return;
+                    }
+                    const n = parseInt(digits, 10);
+                    handleUserChange(
+                      "last_stories_filter",
+                      n > 99 ? 99 : n,
+                    );
+                  }}
+                  aria-labelledby="topic-memory-section-title"
+                  className="mt-4 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                  placeholder="0–99"
+                />
+              </section>
+            </motion.div>
+          </div>
         </div>
       </div>
 
@@ -1054,7 +1638,9 @@ export function UserSettingsClient({
         className={activeTab === "tone" ? "" : "hidden"}
       >
         <div className="flex flex-col gap-6">
-          <p className="mt-1 text-xs text-[var(--text-muted)]">How would you like the reading material to be written?</p>
+          <p className="mt-1 text-center text-xs italic text-[var(--text-muted)]">
+            How should the reading material be written?
+          </p>
           {storyGenToneUsage.length > 0 && (
             <section className={panelClass}>
               <h2 className="text-base font-semibold text-[var(--foreground)]">
@@ -1193,7 +1779,7 @@ export function UserSettingsClient({
               type="button"
               className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
               aria-label="Dismiss"
-              onClick={() => setPendingLeave(null)}
+              onClick={dismissPendingLeaveDialog}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
@@ -1213,28 +1799,48 @@ export function UserSettingsClient({
                   className="text-center text-sm text-[var(--prose-text)]"
                 >
                   {pendingLeave?.kind === "tab"
-                    ? "You have unsaved changes. Switch tabs without saving?"
-                    : "You have unsaved changes. Leave this page without saving?"}
+                    ? topicsDirty
+                      ? "You have unsaved topic changes. Switch tabs without saving?"
+                      : "You have unsaved changes. Switch tabs without saving?"
+                    : topicsDirty
+                      ? "You have unsaved topic changes. Leave without saving?"
+                      : "You have unsaved changes. Leave this page without saving?"}
                 </p>
-                <div className="mt-6 flex gap-3">
+                {topicsDirty ? (
+                  <p className="mt-2 text-center text-xs text-[var(--text-muted)]">
+                    Active topics, additions, and removals are not saved until you
+                    choose Save.
+                  </p>
+                ) : null}
+                <div className="mt-6 flex flex-col gap-2">
                   <button
                     type="button"
-                    onClick={() => setPendingLeave(null)}
-                    className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
+                    onClick={() => void handleSaveAndContinueLeave()}
+                    disabled={saving}
+                    className="w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Stay on page
+                    {saving ? "Saving…" : "Save and continue"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => pendingLeave && tryLeave(pendingLeave)}
-                    className="flex-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90"
-                  >
-                    {pendingLeave?.kind === "logout"
-                      ? "Leave without saving"
-                      : pendingLeave?.kind === "tab"
-                        ? "Switch tab"
-                        : "Leave page"}
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={dismissPendingLeaveDialog}
+                      className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--nav-hover-bg)]"
+                    >
+                      Stay
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pendingLeave && tryLeave(pendingLeave)}
+                      className="flex-1 rounded-2xl border border-[var(--border-default)] py-2.5 text-sm font-medium text-[var(--semantic-danger-inline)] transition-colors hover:bg-[var(--semantic-danger-hover)]"
+                    >
+                      {pendingLeave?.kind === "logout"
+                        ? "Log out without saving"
+                        : pendingLeave?.kind === "tab"
+                          ? "Switch tab"
+                          : "Leave page"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -1312,6 +1918,26 @@ export function UserSettingsClient({
               : []
         }
         onClose={() => setPromptHistoryOpen(null)}
+        onCopyTopicToField={handleCopyTopicFromHistory}
+        fieldFilledTopicKey={promptHistoryFilledTopicKey}
+      />
+
+      <DefaultTopicPresetsModal
+        open={defaultTopicPresetsOpen}
+        onClose={() => setDefaultTopicPresetsOpen(false)}
+        onClearSelection={() => setDefaultTopicPresetSelectedIds([])}
+        categories={defaultTopicCategories}
+        selectedPresetIds={defaultTopicPresetSelectedIds}
+        onSelectPreset={(id) =>
+          setDefaultTopicPresetSelectedIds((cur) =>
+            cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+          )
+        }
+        fieldFilledPresetId={defaultTopicFieldFilledPresetId}
+        onFillTopicField={handleFillTopicFieldFromPreset}
+        onAddSelected={handleAddSelectedDefaultTopic}
+        addSelectedDisabled={defaultTopicAddSelectedDisabled}
+        addSelectedTitle={defaultTopicAddSelectedTitle}
       />
     </div>
   );

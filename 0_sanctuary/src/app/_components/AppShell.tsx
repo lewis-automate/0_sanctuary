@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { PropsWithChildren } from "react";
 import { Suspense } from "react";
 import { BottomNav } from "./BottomNav";
+import { NavigationLoadingOverlay } from "./NavigationLoadingOverlay";
 
 type ShellInnerProps = PropsWithChildren<{
   immersiveVocab: boolean;
@@ -44,6 +45,7 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
 
   return (
     <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
+      <NavigationLoadingOverlay />
       {!chromeHidden && !onMainSettingsHub && !practiceChat ? (
         <Link
           href="/settings"

@@ -183,6 +183,9 @@ export function AddVocabPanel() {
             activities.
           </div>
         ) : null}
+        <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+          Add new vocabulary
+        </h2>
         <div className="space-y-3">
           {rows.map((row, index) => (
             <VocabLineField

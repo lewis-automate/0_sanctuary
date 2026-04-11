@@ -387,7 +387,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         ) : (
           <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
             If you leave now, you&apos;ll exit rapid review. You can start
-            again anytime from Practice.
+            again anytime from Study.
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -440,7 +440,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         {exitDialog}
         {topBar}
         <p className="text-[var(--text-muted)]">
-          No saved words yet. Add some under Add first.
+          No saved words yet. Add vocabulary below Rapid review first.
         </p>
       </div>
     );

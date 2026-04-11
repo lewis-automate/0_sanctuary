@@ -4,18 +4,8 @@ import Link from "next/link";
 import { FadeIn } from "../_components/FadeIn";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { DIFFICULTY_OPTIONS } from "@/lib/difficulty-options";
 import { queueStoryGeneration } from "./actions";
-
-const DIFFICULTY_OPTIONS = [
-  "A1",
-  "A1/A2",
-  "A2",
-  "A2/B1",
-  "B1",
-  "B1/B2",
-  "B2",
-  "B2/C1",
-] as const;
 
 /** Long enough for success swipe + fade; re-tune if SUCCESS_SWIPE_MS / SUCCESS_FADE_MS change. */
 const COOLDOWN_SECONDS = 5;
@@ -33,7 +23,6 @@ const SUCCESS_FADE_MS = 900;
 export default function CreatePage() {
   const shouldReduceMotion = useReducedMotion();
   const [topic, setTopic] = useState("");
-  const [tone, setTone] = useState("");
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [wordCount, setWordCount] = useState("");
   const [topicMemory, setTopicMemory] = useState("");
@@ -53,7 +42,6 @@ export default function CreatePage() {
           clearInterval(id);
           // Clear all form inputs when countdown finishes
           setTopic("");
-          setTone("");
           setDifficulty(null);
           setWordCount("");
           setTopicMemory("");
@@ -119,7 +107,6 @@ export default function CreatePage() {
     setSubmitting(true);
     const result = await queueStoryGeneration({
       topic: topic || undefined,
-      tone: tone || undefined,
       difficulty: difficulty || undefined,
       word_count: wordCount || undefined,
       last_stories_filter: (() => {
@@ -148,7 +135,7 @@ export default function CreatePage() {
         </p>
       </header>
 
-      <p className="mb-6 text-left text-sm italic leading-relaxed text-[var(--text-muted)] sm:text-left">
+      <p className="mb-6 text-center text-sm italic leading-relaxed text-[var(--text-muted)]">
         Empty fields will use your default settings.
       </p>
 
@@ -235,32 +222,12 @@ export default function CreatePage() {
           >
         <section>
           <label className="block text-sm font-medium text-[var(--foreground)]">
-            Tone or personality for the writer
-          </label>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">The how...</p>
-          <div className="relative mt-3">
-            <textarea
-              rows={3}
-              maxLength={200}
-              value={tone}
-              onChange={(e) => setTone(e.target.value)}
-              className="w-full resize-none rounded-3xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-3 pb-8 text-sm leading-relaxed text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
-              placeholder="Example: The omniscient narrator. Kind, wise, and insightful. Write like it's the winner for a teen literature contest."
-            />
-            <span className="absolute bottom-3 right-3 text-xs text-[var(--field-placeholder)]">
-              {tone.length}/200
-            </span>
-          </div>
-        </section>
-
-        <section>
-          <label className="block text-sm font-medium text-[var(--foreground)]">
-            Difficulty
+            Current level
           </label>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Recommended: Start slightly below your current level.
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
             {DIFFICULTY_OPTIONS.map((label) => {
               const isSelected = difficulty === label;
               return (

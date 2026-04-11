@@ -55,7 +55,12 @@ export function WritingTabs({ initialTab }: WritingTabsProps) {
     <>
       <div className="min-h-0 py-2 pb-4">
         {activeTab === "thoughts" && (
-          <FeedbackSection hideSectionTitle />
+          <>
+            <p className="mb-4 text-center text-sm italic leading-relaxed text-[var(--text-muted)]">
+              Read feedback on your writing in your native tongue and start a review session with a tutor.
+            </p>
+            <FeedbackSection hideSectionTitle />
+          </>
         )}
         {activeTab === "write-now" && <FreeWriterPanel />}
       </div>

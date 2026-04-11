@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { FadeIn } from "../_components/FadeIn";
+import { PageLoading } from "../_components/PageLoading";
 import { VocabReview } from "./vocab-review";
 
-const VALID_TABS = new Set(["add", "saved", "quick-review"]);
+const VALID_TABS = new Set(["saved", "quick-review"]);
 
 type PageProps = {
   searchParams?: Promise<{ tab?: string }> | { tab?: string };
@@ -11,11 +13,16 @@ type PageProps = {
 export default async function VocabPage({ searchParams }: PageProps) {
   const params = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const raw = typeof params.tab === "string" ? params.tab : "";
-  const initialTab = VALID_TABS.has(raw) ? (raw as "add" | "saved" | "quick-review") : undefined;
+  if (raw === "add") {
+    redirect("/vocab?tab=quick-review");
+  }
+  const initialTab = VALID_TABS.has(raw)
+    ? (raw as "saved" | "quick-review")
+    : undefined;
 
   return (
     <FadeIn className="mx-auto w-full max-w-prose">
-      <Suspense fallback={<div className="min-h-[50vh]" aria-hidden />}>
+      <Suspense fallback={<PageLoading />}>
         <VocabReview initialTab={initialTab} />
       </Suspense>
     </FadeIn>

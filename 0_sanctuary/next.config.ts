@@ -11,7 +11,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: "/add-vocab", destination: "/vocab?tab=add", permanent: true },
+      { source: "/add-vocab", destination: "/vocab?tab=quick-review", permanent: true },
       { source: "/writer", destination: "/writing?tab=writenow", permanent: true },
     ];
   },

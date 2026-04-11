@@ -6,8 +6,8 @@ import {
   FilePenLine,
   LayoutDashboard,
   ListChecks,
-  Plus,
-  SquarePen,
+  NotebookText,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -36,12 +36,18 @@ const homeTabs = [
 type TabId = (typeof homeTabs)[number]["id"];
 
 type Props = {
+  welcomeName: string;
   initialTab?: TabId;
   quickReadHref: string;
   stats: HomeStats;
 };
 
-export function HomeDashboard({ initialTab, quickReadHref, stats }: Props) {
+export function HomeDashboard({
+  welcomeName,
+  initialTab,
+  quickReadHref,
+  stats,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(
@@ -86,6 +92,10 @@ export function HomeDashboard({ initialTab, quickReadHref, stats }: Props) {
   const quickActionBtn =
     "flex w-full min-h-[2.75rem] items-center justify-start gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] active:bg-[var(--surface-elevated)]";
 
+  /** Full-width primary CTA for Quick read */
+  const quickReadMainBtn =
+    "flex w-full min-h-[3rem] items-center justify-center gap-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-3 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-[0.995]";
+
   /** Fixed-width column so icons share one vertical rhythm; label fills the rest. */
   const quickActionIconCell =
     "flex w-10 shrink-0 items-center justify-start self-stretch";
@@ -96,11 +106,29 @@ export function HomeDashboard({ initialTab, quickReadHref, stats }: Props) {
 
   const quickIconClass = "h-4 w-4 shrink-0 text-[var(--nav-idle-text)]";
 
+  /** Soft intro copy — italic body, relaxed for full sentences */
+  const introText =
+    "text-sm italic leading-relaxed text-[var(--text-muted)]";
+
   return (
     <>
-      <p className="mb-2 text-center text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)] sm:text-left">
-        Sanctuary
-      </p>
+      <div className="mb-4 mx-auto max-w-[min(100%,20rem)] text-center">
+        <div className="flex flex-col items-center" aria-label="Introduction">
+          {welcomeName ? (
+            <div className="flex flex-col gap-0 [&>p]:m-0">
+              <p className={`${introText} leading-snug`}>
+                Hi{" "}
+                <span className="text-[var(--prose-text)]">{welcomeName}</span>,
+              </p>
+              <p className={`${introText} leading-snug`}>
+                Welcome back to Sanctuary.
+              </p>
+            </div>
+          ) : (
+            <p className={introText}>Welcome back to Sanctuary.</p>
+          )}
+        </div>
+      </div>
 
       <div className="min-h-[50vh] py-2">
         {activeTab === "activity" && (
@@ -114,6 +142,68 @@ export function HomeDashboard({ initialTab, quickReadHref, stats }: Props) {
 
         {activeTab === "main" && (
           <div className="space-y-4">
+            <section
+              aria-label="Quick actions"
+              className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-3.5"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={quickReadHref}
+                  className={`${quickReadMainBtn} col-span-2`}
+                >
+                  <BookOpen
+                    className="h-5 w-5 shrink-0 text-[var(--nav-active-fg)] opacity-95"
+                    strokeWidth={2}
+                    aria-hidden
+                  />
+                  <span>Quick read</span>
+                </Link>
+                <QuickCreateStoryButton
+                  className={quickActionBtn}
+                  titleClassName={quickCreateTitle}
+                  subClassName=""
+                  compact
+                  leadingIcon={
+                    <FilePenLine
+                      className={quickIconClass}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  }
+                />
+                <Link href="/settings?tab=topics" className={quickActionBtn}>
+                  <span className={quickActionIconCell}>
+                    <Tag
+                      className={quickIconClass}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  </span>
+                  <span className={quickActionLabel}>Set new topic</span>
+                </Link>
+                <Link href="/writing" className={quickActionBtn}>
+                  <span className={quickActionIconCell}>
+                    <NotebookText
+                      className={quickIconClass}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  </span>
+                  <span className={quickActionLabel}>Review writing</span>
+                </Link>
+                <Link href="/vocab?tab=quick-review" className={quickActionBtn}>
+                  <span className={quickActionIconCell}>
+                    <ListChecks
+                      className={quickIconClass}
+                      strokeWidth={2}
+                      aria-hidden
+                    />
+                  </span>
+                  <span className={quickActionLabel}>Review vocab</span>
+                </Link>
+              </div>
+            </section>
+
             <section
               aria-label="Reading progress"
               className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-6"
@@ -191,70 +281,6 @@ export function HomeDashboard({ initialTab, quickReadHref, stats }: Props) {
                   </tr>
                 </tbody>
               </table>
-            </section>
-
-            <section
-              aria-label="Quick actions"
-              className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-3.5"
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <QuickCreateStoryButton
-                  className={quickActionBtn}
-                  titleClassName={quickCreateTitle}
-                  subClassName=""
-                  compact
-                  leadingIcon={
-                    <FilePenLine
-                      className={quickIconClass}
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                  }
-                />
-                <Link href={quickReadHref} className={quickActionBtn}>
-                  <span className={quickActionIconCell}>
-                    <BookOpen
-                      className={quickIconClass}
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                  </span>
-                  <span className={quickActionLabel}>Quick read</span>
-                </Link>
-                <Link href="/vocab?tab=quick-review" className={quickActionBtn}>
-                  <span className={quickActionIconCell}>
-                    <ListChecks
-                      className={quickIconClass}
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                  </span>
-                  <span className={quickActionLabel}>Vocab review</span>
-                </Link>
-                <Link href="/writing?tab=writenow" className={quickActionBtn}>
-                  <span className={quickActionIconCell}>
-                    <SquarePen
-                      className={quickIconClass}
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                  </span>
-                  <span className={quickActionLabel}>Write</span>
-                </Link>
-                <Link
-                  href="/vocab?tab=add"
-                  className={`${quickActionBtn} col-span-2`}
-                >
-                  <span className={quickActionIconCell}>
-                    <Plus
-                      className={quickIconClass}
-                      strokeWidth={2}
-                      aria-hidden
-                    />
-                  </span>
-                  <span className={quickActionLabel}>Add vocab</span>
-                </Link>
-              </div>
             </section>
           </div>
         )}
