@@ -36,6 +36,7 @@ import {
   NATIVE_LANGUAGE_OTHER_VALUE,
   NATIVE_LANGUAGE_PRESETS,
 } from "@/lib/native-language-options";
+import { getSortedIanaTimeZones } from "@/lib/iana-timezones";
 import { getSupabase } from "@/lib/supabase";
 import type {
   UserSettingsProfile,
@@ -58,6 +59,10 @@ const MAX_TOPICS = 100;
 const MAX_USERNAME_LENGTH = 99;
 const MAX_TOPIC_NAME_LENGTH = 200;
 const MAX_NATIVE_LANGUAGE_CUSTOM_LENGTH = 99;
+
+/** Avoid rendering hundreds of rows until the user narrows the search. */
+const TIMEZONE_SEARCH_MIN_CHARS = 2;
+const TIMEZONE_SEARCH_MAX_SHOWN = 80;
 
 const settingsHeaderFabClass =
   "mt-0.5 inline-flex shrink-0 rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--foreground)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/15 disabled:cursor-not-allowed disabled:opacity-60 sm:mt-0";
@@ -608,7 +613,33 @@ export function UserSettingsClient({
   const [promptHistoryFilledTopicKey, setPromptHistoryFilledTopicKey] =
     useState<string | null>(null);
   const newTopicTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const timezoneDefaultAppliedRef = useRef(false);
+  const [timezoneSearchQuery, setTimezoneSearchQuery] = useState("");
   const shouldReduceMotion = useReducedMotion();
+
+  const ianaTimeZones = useMemo(() => getSortedIanaTimeZones(), []);
+
+  const timezoneSelectOptions = useMemo(() => {
+    const z = user.timezone.trim();
+    if (!z) return ianaTimeZones;
+    const set = new Set(ianaTimeZones);
+    if (set.has(z)) return ianaTimeZones;
+    return [z, ...ianaTimeZones];
+  }, [ianaTimeZones, user.timezone]);
+
+  const timezoneSearchMatches = useMemo(() => {
+    const q = timezoneSearchQuery.trim().toLowerCase();
+    if (q.length < TIMEZONE_SEARCH_MIN_CHARS) {
+      return { shown: [] as string[], total: 0 };
+    }
+    const all = timezoneSelectOptions.filter((tz) =>
+      tz.toLowerCase().includes(q),
+    );
+    return {
+      shown: all.slice(0, TIMEZONE_SEARCH_MAX_SHOWN),
+      total: all.length,
+    };
+  }, [timezoneSearchQuery, timezoneSelectOptions]);
 
   const defaultTopicCategories = useMemo(
     () =>
@@ -803,6 +834,21 @@ export function UserSettingsClient({
       user.app_theme,
     );
   }, [user.app_theme]);
+
+  useEffect(() => {
+    if (timezoneDefaultAppliedRef.current) return;
+    timezoneDefaultAppliedRef.current = true;
+    setUser((prev) => {
+      if (prev.timezone.trim() !== "") return prev;
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) return { ...prev, timezone: tz };
+      } catch {
+        /* ignore */
+      }
+      return prev;
+    });
+  }, []);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -1156,7 +1202,8 @@ export function UserSettingsClient({
               Profile
             </h2>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
-              Username, native language, and the language you are learning.
+              Username, native language, timezone, and the language you are
+              learning.
             </p>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <div className="space-y-1 md:col-span-2">
@@ -1242,6 +1289,74 @@ export function UserSettingsClient({
                   className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
                   placeholder="e.g. Spanish"
                 />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-medium text-[var(--prose-text)]">
+                  Timezone
+                </label>
+                <input
+                  type="search"
+                  autoComplete="off"
+                  value={timezoneSearchQuery}
+                  onChange={(e) => setTimezoneSearchQuery(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-sm text-[var(--field-text)] placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-0"
+                  placeholder="Search (e.g. Brussels, Tokyo, America/New_York)"
+                  aria-label="Search IANA timezones"
+                />
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Selected:{" "}
+                  {user.timezone.trim() ? user.timezone : "—"}
+                </p>
+                {timezoneSearchQuery.trim().length > 0 &&
+                  timezoneSearchQuery.trim().length <
+                    TIMEZONE_SEARCH_MIN_CHARS && (
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Type at least {TIMEZONE_SEARCH_MIN_CHARS} characters to
+                      see matches.
+                    </p>
+                  )}
+                {timezoneSearchQuery.trim().length >=
+                  TIMEZONE_SEARCH_MIN_CHARS &&
+                  timezoneSearchMatches.total === 0 && (
+                    <p className="mt-2 text-xs text-[var(--text-muted)]">
+                      No matching timezones. Try another spelling.
+                    </p>
+                  )}
+                {timezoneSearchMatches.shown.length > 0 ? (
+                  <ul
+                    className="mt-2 max-h-48 list-none overflow-y-auto rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] p-1"
+                    role="listbox"
+                    aria-label="Timezone matches"
+                  >
+                    {timezoneSearchMatches.shown.map((tz) => {
+                      const active = user.timezone === tz;
+                      return (
+                        <li key={tz} role="option" aria-selected={active}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUserChange("timezone", tz);
+                              setTimezoneSearchQuery("");
+                            }}
+                            className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                              active
+                                ? "bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                                : "text-[var(--field-text)] hover:bg-[var(--chrome-fab-hover)]"
+                            }`}
+                          >
+                            {tz}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {timezoneSearchMatches.total > TIMEZONE_SEARCH_MAX_SHOWN ? (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Showing {TIMEZONE_SEARCH_MAX_SHOWN} of{" "}
+                    {timezoneSearchMatches.total} matches. Type more to narrow.
+                  </p>
+                ) : null}
               </div>
             </div>
           </section>

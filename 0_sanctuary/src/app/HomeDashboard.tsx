@@ -17,6 +17,11 @@ import {
   SubNavTabBar,
   subNavTabButtonClass,
 } from "./_components/SubNavTabBar";
+import {
+  ReadingYearCalendar,
+  type ReadingCalendarModel,
+} from "./_components/ReadingYearCalendar";
+import type { ShowUpEncouragement } from "@/lib/show-up-encouragement";
 import { CurrentActivities } from "./library/CurrentActivities";
 
 export type HomeStats = {
@@ -40,6 +45,8 @@ type Props = {
   initialTab?: TabId;
   quickReadHref: string;
   stats: HomeStats;
+  readingCalendar: ReadingCalendarModel;
+  showUpEncouragement: ShowUpEncouragement | null;
 };
 
 export function HomeDashboard({
@@ -47,6 +54,8 @@ export function HomeDashboard({
   initialTab,
   quickReadHref,
   stats,
+  readingCalendar,
+  showUpEncouragement,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -281,6 +290,31 @@ export function HomeDashboard({
                   </tr>
                 </tbody>
               </table>
+            </section>
+
+            {showUpEncouragement ? (
+              <section
+                aria-label="Your month so far"
+                className="rounded-3xl border border-[var(--border-default)]/80 bg-[var(--surface-panel)] px-4 py-3.5 sm:px-5 sm:py-4"
+              >
+                <p className="text-sm leading-relaxed text-[var(--foreground)]">
+                  <span className="font-medium text-[var(--prose-text)]">
+                    {showUpEncouragement.summaryLine}
+                  </span>
+                </p>
+                <p
+                  className={`${introText} mt-2 text-left sm:text-center`}
+                >
+                  {showUpEncouragement.encouragement}
+                </p>
+              </section>
+            ) : null}
+
+            <section
+              aria-label="Reading calendar"
+              className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-4"
+            >
+              <ReadingYearCalendar model={readingCalendar} />
             </section>
           </div>
         )}

@@ -59,6 +59,7 @@ function mapRowToUserProfile(
     username,
     target_language: String(row.target_language ?? ""),
     native_language: String(row.native_language ?? ""),
+    timezone: String(row.timezone ?? ""),
     difficulty,
     word_target: coerceWordTarget(row.word_target),
     last_stories_filter: coerceLastStoriesFilter(
@@ -74,6 +75,7 @@ const EMPTY_PROFILE: UserSettingsProfile = {
   username: "",
   target_language: "",
   native_language: "",
+  timezone: "",
   difficulty: null,
   word_target: null,
   last_stories_filter: null,

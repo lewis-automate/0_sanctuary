@@ -6,6 +6,8 @@ export type UserSettingsProfile = {
   username: string;
   target_language: string;
   native_language: string;
+  /** IANA timezone, e.g. America/New_York */
+  timezone: string;
   difficulty: string | null;
   word_target: number | null;
   last_stories_filter: number | null;

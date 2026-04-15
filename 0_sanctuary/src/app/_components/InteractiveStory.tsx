@@ -130,6 +130,10 @@ export function InteractiveStory({
     "below",
   );
   const [savedVocab, setSavedVocab] = useState<string[]>([]);
+  /** Floating toast after Save (not shown in the highlight toolbar) */
+  const [vocabToast, setVocabToast] = useState<"saved" | "duplicate" | null>(
+    null,
+  );
   const [thoughts, setThoughts] = useState("");
   const [difficulty, setDifficulty] = useState<number | null>(null);
   const [engagement, setEngagement] = useState<number | null>(null);
@@ -193,6 +197,12 @@ export function InteractiveStory({
       document.removeEventListener("touchstart", handleTouchStart);
     };
   }, [tooltip]);
+
+  useEffect(() => {
+    if (!vocabToast) return;
+    const id = window.setTimeout(() => setVocabToast(null), 2400);
+    return () => window.clearTimeout(id);
+  }, [vocabToast]);
 
   const showTooltipFromSelection = useCallback(() => {
     // Read after layout so getBoundingClientRect matches the committed selection
@@ -265,14 +275,25 @@ export function InteractiveStory({
   }, [showTooltipFromSelection]);
 
   const handleSaveVocab = useCallback(() => {
-    if (tooltip && isReaderVocabSelectionWithinLimit(tooltip.text)) {
-      setSavedVocab((prev) => {
-        if (prev.includes(tooltip.text) || prev.length >= 15) return prev;
-        return [...prev, tooltip.text];
+    if (!tooltip || !isReaderVocabSelectionWithinLimit(tooltip.text)) return;
+    const text = tooltip.text;
+    setSavedVocab((prev) => {
+      if (prev.includes(text)) {
+        queueMicrotask(() => {
+          setVocabToast("duplicate");
+          window.getSelection()?.removeAllRanges();
+          setTooltip(null);
+        });
+        return prev;
+      }
+      if (prev.length >= 15) return prev;
+      queueMicrotask(() => {
+        setVocabToast("saved");
+        window.getSelection()?.removeAllRanges();
+        setTooltip(null);
       });
-      window.getSelection()?.removeAllRanges();
-      setTooltip(null);
-    }
+      return [...prev, text];
+    });
   }, [tooltip]);
 
   const handleRemoveVocab = useCallback((word: string) => {
@@ -306,8 +327,12 @@ export function InteractiveStory({
     : !targetLanguage.trim() || !nativeLanguage.trim()
       ? "Add target and native language in Settings"
       : undefined;
+  const selectionAlreadyInVocab = Boolean(
+    tooltip?.text && savedVocab.includes(tooltip.text),
+  );
   const canSaveToVocab =
-    vocabSelectionWithinLimit && savedVocab.length < 15;
+    vocabSelectionWithinLimit &&
+    (savedVocab.length < 15 || selectionAlreadyInVocab);
 
   const handleTranslate = useCallback(async () => {
     if (!tooltip?.text.trim() || !isReaderTranslateSelectionWithinLimit(tooltip.text))
@@ -582,7 +607,7 @@ export function InteractiveStory({
               {tooltip && (
                 <div
                   ref={tooltipRef}
-                  className="fixed z-50"
+                  className="fixed z-50 before:pointer-events-auto before:absolute before:inset-[-16px] before:z-0 before:rounded-full before:content-['']"
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
                   style={{
@@ -591,8 +616,9 @@ export function InteractiveStory({
                     transform: "translate(-50%, -100%)",
                   }}
                 >
+                  {/* Inner full-bleed layer: flex gaps can miss hit-testing; this catches mousedown behind the row. */}
                   <motion.div
-                    className="flex items-center gap-3 rounded-full border border-[var(--border-default)] bg-[var(--surface-panel)]/90 p-2 shadow-lg ring-1 ring-[var(--border-default)] backdrop-blur-sm"
+                    className="relative z-10 rounded-full border border-[var(--border-default)] bg-[var(--surface-panel)]/90 p-2 shadow-lg ring-1 ring-[var(--border-default)] backdrop-blur-sm"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{
@@ -601,6 +627,12 @@ export function InteractiveStory({
                       transition: { duration: 0.2, ease: "easeOut" },
                     }}
                   >
+                    <div
+                      className="pointer-events-auto absolute inset-0 z-0 rounded-full bg-[var(--surface-panel)]/90"
+                      aria-hidden
+                    />
+                    <div className="relative z-10 flex min-w-0 items-center">
+                    {/* Spacers instead of flex gap so clicks in “between” hit a real node (gap can pass through). */}
                     <div className={TOOLBAR_CLUSTER}>
                       <button
                         type="button"
@@ -616,7 +648,8 @@ export function InteractiveStory({
                         <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
                       </button>
                     </div>
-                    <div className={`${TOOLBAR_CLUSTER} gap-1.5`}>
+                    <div className="w-3 shrink-0 self-stretch" aria-hidden />
+                    <div className={`${TOOLBAR_CLUSTER} flex items-center`}>
                       <button
                         type="button"
                         disabled={!canTranslate}
@@ -631,14 +664,17 @@ export function InteractiveStory({
                       >
                         <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
                       </button>
+                      <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
                       <button
                         type="button"
                         title={
                           !vocabSelectionWithinLimit
                             ? `Selection too long for Save (max ${MAX_READER_VOCAB_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
-                            : savedVocab.length >= 15
+                            : savedVocab.length >= 15 && !selectionAlreadyInVocab
                               ? "Saved vocab limit reached (15)"
-                              : "Save to vocab list"
+                              : selectionAlreadyInVocab
+                                ? "Already in your list"
+                                : "Save to vocab list"
                         }
                         onPointerDown={(e) => e.preventDefault()}
                         onClick={(e) => {
@@ -651,6 +687,7 @@ export function InteractiveStory({
                       >
                         Save
                       </button>
+                      <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
                       <button
                         type="button"
                         disabled={!canGrammar}
@@ -666,6 +703,7 @@ export function InteractiveStory({
                         <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
                       </button>
                     </div>
+                    <div className="w-3 shrink-0 self-stretch" aria-hidden />
                     <div className={TOOLBAR_CLUSTER}>
                       <button
                         type="button"
@@ -680,6 +718,7 @@ export function InteractiveStory({
                       >
                         <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
                       </button>
+                    </div>
                     </div>
                   </motion.div>
                 </div>
@@ -836,6 +875,35 @@ export function InteractiveStory({
                       </div>
                     </motion.div>
                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {vocabToast && (
+                <motion.div
+                  key={vocabToast}
+                  role="status"
+                  aria-live="polite"
+                  initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{
+                    opacity: 0,
+                    y: 10,
+                    scale: 0.98,
+                    transition: { duration: 0.28, ease: "easeIn" },
+                  }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[60] flex max-w-[min(90vw,20rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-4 py-3 text-sm font-medium text-[var(--semantic-success-text)] shadow-lg shadow-black/10"
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full bg-[var(--semantic-success-icon)]"
+                    aria-hidden
+                  />
+                  {vocabToast === "saved" ? (
+                    <span>Saved.</span>
+                  ) : (
+                    <span>Already saved.</span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
