@@ -2,7 +2,8 @@
 
 import { ChevronDown, ChevronUp, Copy } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { queueFeedbackReviewed } from "./actions";
 import { useActivityQueueProcessingTargets } from "@/lib/useActivityQueueProcessingTargets";
 
 type FeedbackItem = {
@@ -11,7 +12,6 @@ type FeedbackItem = {
   alternate_version: string | null;
   feedback: string | null;
   focus_point: string | null;
-  /** Set server-side when a review session is completed (not toggled from this UI). */
   reviewed: boolean;
 };
 
@@ -32,6 +32,8 @@ export function FeedbackSection({
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [unreviewedOnly, setUnreviewedOnly] = useState(true);
+  const [toggleErrorId, setToggleErrorId] = useState<string | null>(null);
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!copiedId) return;
@@ -79,6 +81,38 @@ export function FeedbackSection({
       cancelled = true;
     };
   }, []);
+
+  const toggleReviewed = useCallback(
+    async (item: FeedbackItem, nextReviewed: boolean) => {
+      if (feedbackReviewIds.has(item.id) || toggleBusyId === item.id) return;
+
+      setToggleErrorId(null);
+      setToggleBusyId(item.id);
+      const previous = item.reviewed;
+      setFeedbackItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, reviewed: nextReviewed } : i,
+        ),
+      );
+
+      const result = await queueFeedbackReviewed({
+        feedback_id: item.id,
+        reviewed: nextReviewed,
+        focus_point: item.focus_point,
+      });
+
+      setToggleBusyId(null);
+      if (!result.ok) {
+        setFeedbackItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id ? { ...i, reviewed: previous } : i,
+          ),
+        );
+        setToggleErrorId(item.id);
+      }
+    },
+    [feedbackReviewIds, toggleBusyId],
+  );
 
   const visibleItems = useMemo(
     () =>
@@ -141,6 +175,10 @@ export function FeedbackSection({
         ) : null}
         {visibleItems.map((item) => {
           const isExpanded = feedbackExpandedId === item.id;
+          const isProcessing = feedbackReviewIds.has(item.id);
+          const isToggleBusy = toggleBusyId === item.id;
+          const toggleDisabled = isProcessing || isToggleBusy;
+
           return (
             <li key={item.id}>
               <div className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-[var(--nav-hover-bg)]">
@@ -148,24 +186,36 @@ export function FeedbackSection({
                   <p className="min-w-0 flex-1 font-medium text-[var(--foreground)]">
                     {item.raw_input}
                   </p>
-                  {item.reviewed ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--semantic-success-text)]">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full bg-[var(--semantic-success-icon)]"
-                        aria-hidden
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {isProcessing ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--text-muted)] opacity-90"
+                          aria-hidden
+                        />
+                        Processing
+                      </span>
+                    ) : null}
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)]">
+                      <input
+                        type="checkbox"
+                        checked={item.reviewed}
+                        disabled={toggleDisabled}
+                        onChange={(e) =>
+                          void toggleReviewed(item, e.target.checked)
+                        }
+                        className="h-3.5 w-3.5 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-[var(--nav-active-bg)] disabled:cursor-not-allowed disabled:opacity-50"
                       />
                       Reviewed
-                    </span>
-                  ) : feedbackReviewIds.has(item.id) ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--field-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--text-muted)] opacity-90"
-                        aria-hidden
-                      />
-                      Processing
-                    </span>
-                  ) : null}
+                    </label>
+                  </div>
                 </div>
+
+                {toggleErrorId === item.id ? (
+                  <p className="text-[11px] text-[var(--semantic-danger-inline)]">
+                    Could not update reviewed status. Try again.
+                  </p>
+                ) : null}
 
                 <div className="flex flex-wrap items-center gap-2">
                   <button

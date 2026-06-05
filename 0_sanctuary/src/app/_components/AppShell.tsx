@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { PropsWithChildren } from "react";
 import { Suspense } from "react";
+import { ActivityPopup } from "./ActivityPopup";
 import { BottomNav } from "./BottomNav";
 import { NavigationLoadingOverlay } from "./NavigationLoadingOverlay";
 
@@ -29,8 +30,7 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
 
   const hasBottomTabStack =
     !chromeHidden &&
-    (pathname === "/" ||
-      pathname === "/writing" ||
+    (pathname === "/writing" ||
       (pathname === "/vocab" && !immersiveVocab));
 
   const mainPadding = chromeHidden
@@ -43,9 +43,12 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
         ? "pb-40 pt-10"
         : "pb-28 pt-10";
 
+  const showGlobalChrome = !hideNav;
+
   return (
     <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
       <NavigationLoadingOverlay />
+      {showGlobalChrome ? <ActivityPopup /> : null}
       {!chromeHidden && !onMainSettingsHub && !practiceChat ? (
         <Link
           href="/settings"

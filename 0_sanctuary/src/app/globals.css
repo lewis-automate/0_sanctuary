@@ -60,6 +60,12 @@ html[data-app-theme="light"] {
   --semantic-danger-hover: rgb(239 68 68 / 0.14);
   --semantic-danger-soft-border: #ffe4e6;
   --semantic-danger-inline: #dc2626;
+
+  /* Reading calendar day intensity (based on --nav-active-bg) */
+  --calendar-read-1: rgb(15 23 42 / 0.18);
+  --calendar-read-2: rgb(15 23 42 / 0.38);
+  --calendar-read-3: rgb(15 23 42 / 0.58);
+  --calendar-read-4: rgb(15 23 42 / 0.82);
 }
 
 /* Dark: muted blue-violet gray; avoid bright “pill” nav + illegible slate-on-dark. */
@@ -118,6 +124,12 @@ html[data-app-theme="dark"] {
   --semantic-danger-hover: rgb(248 113 113 / 0.14);
   --semantic-danger-soft-border: rgb(127 29 29 / 0.45);
   --semantic-danger-inline: #fca5a5;
+
+  /* Reading calendar day intensity (based on --nav-active-bg) */
+  --calendar-read-1: rgb(235 232 227 / 0.12);
+  --calendar-read-2: rgb(235 232 227 / 0.22);
+  --calendar-read-3: rgb(235 232 227 / 0.36);
+  --calendar-read-4: rgb(50 56 72 / 0.95);
 }
 
 @theme inline {

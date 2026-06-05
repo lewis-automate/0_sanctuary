@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { cancelPendingNavigation } from "../_components/NavigationLoadingOverlay";
 import {
   queueRapidReviewComplete,
   queueStudyItemArchive,
@@ -279,6 +280,18 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
     setExitDialogOpen(true);
   }, []);
 
+  const dismissExitDialog = useCallback(() => {
+    setExitDialogOpen(false);
+    cancelPendingNavigation();
+  }, []);
+
+  const queueAgain = useCallback(() => {
+    if (!current || ratingBusy || !(showDefinition || showTranslation)) return;
+    setRatingSaveError(null);
+    setQueue((q) => (q ? [...q, { ...current }] : q));
+    setIndex((i) => i + 1);
+  }, [current, ratingBusy, showDefinition, showTranslation]);
+
   const chip =
     "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed bg-[var(--field-bg)]";
   const chipHard =
@@ -287,6 +300,8 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
     "text-[var(--foreground)] border-[var(--border-default)] hover:bg-[var(--surface-elevated)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
   const chipEasy =
     "border-[var(--semantic-success-border)] text-[var(--semantic-success-text)] hover:bg-[var(--semantic-success-hover)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
+  const chipAgain =
+    "border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)] disabled:border-[var(--border-default)] disabled:bg-[var(--surface-elevated)] disabled:text-[var(--field-placeholder)] disabled:opacity-70 disabled:hover:bg-[var(--surface-elevated)]";
 
   const hintBtn =
     "flex-1 rounded-2xl border px-4 py-3.5 text-sm font-medium transition-colors";
@@ -366,7 +381,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         className="absolute inset-0 bg-black/45 disabled:cursor-not-allowed"
         aria-label="Close dialog"
         disabled={exitBusy}
-        onClick={() => !exitBusy && setExitDialogOpen(false)}
+        onClick={() => !exitBusy && dismissExitDialog()}
       />
       <div
         role="dialog"
@@ -395,7 +410,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
             type="button"
             className={btnSecondary}
             disabled={exitBusy}
-            onClick={() => setExitDialogOpen(false)}
+            onClick={dismissExitDialog}
           >
             Stay
           </button>
@@ -569,6 +584,15 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
               Easy
             </button>
           </div>
+
+          <button
+            type="button"
+            disabled={!ratingUnlocked || ratingBusy}
+            onClick={queueAgain}
+            className={`${chip} ${chipAgain} w-full`}
+          >
+            Again
+          </button>
         </div>
       </div>
     </div>

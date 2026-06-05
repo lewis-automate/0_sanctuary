@@ -9,6 +9,10 @@ const EASE_SOFT = [0.83, 0, 0.17, 1] as const;
 /** Fired when in-app navigation was cancelled (e.g. Stay on unsaved settings) so the loading blur clears. */
 export const CANCEL_PENDING_NAVIGATION_EVENT = "sanctuary:cancel-pending-navigation";
 
+export function cancelPendingNavigation() {
+  window.dispatchEvent(new CustomEvent(CANCEL_PENDING_NAVIGATION_EVENT));
+}
+
 function NavigationLoadingOverlayInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();

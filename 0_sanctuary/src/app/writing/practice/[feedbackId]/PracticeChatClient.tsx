@@ -14,6 +14,7 @@ import {
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { queueFeedbackReviewed } from "@/app/vocab/actions";
+import { cancelPendingNavigation } from "@/app/_components/NavigationLoadingOverlay";
 import {
   MAX_USER_PRACTICE_CHARS,
   MAX_USER_PRACTICE_MESSAGES,
@@ -288,6 +289,11 @@ export function PracticeChatClient({ feedbackId, studyItem }: Props) {
     }
   }
 
+  function dismissIncompleteDialog() {
+    setIncompleteDialogOpen(false);
+    cancelPendingNavigation();
+  }
+
   async function completeAndContinue() {
     setMarkingDone(true);
     setError(null);
@@ -409,7 +415,7 @@ export function PracticeChatClient({ feedbackId, studyItem }: Props) {
             type="button"
             className="absolute inset-0 bg-black/45"
             aria-label="Close dialog"
-            onClick={() => setIncompleteDialogOpen(false)}
+            onClick={dismissIncompleteDialog}
           />
           <div
             role="dialog"
@@ -430,7 +436,7 @@ export function PracticeChatClient({ feedbackId, studyItem }: Props) {
               <button
                 type="button"
                 className={btnSecondary}
-                onClick={() => setIncompleteDialogOpen(false)}
+                onClick={dismissIncompleteDialog}
               >
                 Stay
               </button>

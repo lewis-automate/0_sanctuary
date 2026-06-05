@@ -32,13 +32,19 @@ export default function ContinuePage() {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Link href="/library" className={primaryCtaBtn}>
-            Read more
+            Library
           </Link>
-          <Link href="/vocab?tab=quick-review" className={secondaryCtaBtn}>
-            Vocab Review
+          <Link
+            href="/vocab?tab=quick-review&flow=rapid-review"
+            className={secondaryCtaBtn}
+          >
+            Vocab review
           </Link>
-          <Link href="/writing" className={`${secondaryCtaBtn} sm:col-span-2`}>
-            Writing practice
+          <Link
+            href="/writing?tab=thoughts"
+            className={`${secondaryCtaBtn} sm:col-span-2`}
+          >
+            Writing feedback
           </Link>
         </div>
 

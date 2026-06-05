@@ -20,9 +20,8 @@ import { createClient } from "@/lib/supabase/server";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-const VALID_HOME_TABS = new Set(["main", "activity"]);
-/** Older bookmarks normalize to Main on the client; SSR default uses this too. */
-const LEGACY_HOME_TAB_TO_MAIN = new Set(["shortcuts", "progress"]);
+/** Legacy `/?tab=…` bookmarks — home is a single view now. */
+const LEGACY_HOME_TAB = new Set(["shortcuts", "progress", "activity", "main"]);
 
 type PageProps = {
   searchParams?: Promise<{ tab?: string }> | { tab?: string };
@@ -210,11 +209,9 @@ export async function HomePageContent({ searchParams }: PageProps) {
   const params =
     searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const raw = typeof params.tab === "string" ? params.tab : "";
-  const initialTab = VALID_HOME_TABS.has(raw)
-    ? (raw as "main" | "activity")
-    : LEGACY_HOME_TAB_TO_MAIN.has(raw)
-      ? ("main" as const)
-      : undefined;
+  if (raw && LEGACY_HOME_TAB.has(raw)) {
+    redirect("/");
+  }
 
   const [welcomeName, { quickReadHref, stats, readingCalendar, showUpEncouragement }] =
     await Promise.all([
@@ -225,7 +222,6 @@ export async function HomePageContent({ searchParams }: PageProps) {
   return (
     <HomeDashboard
       welcomeName={welcomeName}
-      initialTab={initialTab}
       quickReadHref={quickReadHref}
       stats={stats}
       readingCalendar={readingCalendar}

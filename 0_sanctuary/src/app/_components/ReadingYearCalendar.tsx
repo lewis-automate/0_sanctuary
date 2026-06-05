@@ -114,6 +114,22 @@ function monthKey(year: number, month: number): string {
   return `${year}-${month}`;
 }
 
+/** 0 = none, 1–4 = increasing read count for the day. */
+function readIntensityLevel(count: number): 0 | 1 | 2 | 3 | 4 {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  if (count === 3) return 3;
+  return 4;
+}
+
+const CALENDAR_INTENSITY_CLASS: Record<1 | 2 | 3 | 4, string> = {
+  1: "bg-[var(--calendar-read-1)]",
+  2: "bg-[var(--calendar-read-2)]",
+  3: "bg-[var(--calendar-read-3)]",
+  4: "bg-[var(--calendar-read-4)]",
+};
+
 type Props = {
   model: ReadingCalendarModel;
 };
@@ -359,6 +375,22 @@ export function ReadingYearCalendar({ model }: Props) {
           </>
         )}
       </p>
+
+      <div
+        className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-[var(--text-muted)] sm:text-[11px]"
+        aria-hidden
+      >
+        <span>Less</span>
+        <div className="flex items-center gap-0.5">
+          {([1, 2, 3, 4] as const).map((level) => (
+            <span
+              key={level}
+              className={`h-2.5 w-2.5 rounded-full ${CALENDAR_INTENSITY_CLASS[level]}`}
+            />
+          ))}
+        </div>
+        <span>More</span>
+      </div>
     </div>
   );
 }
@@ -374,7 +406,8 @@ function DayDisk({
   dateKey: string;
   todayDateKey: string;
 }) {
-  const has = count > 0;
+  const intensity = readIntensityLevel(count);
+  const has = intensity > 0;
   const isToday = todayDateKey && dateKey === todayDateKey;
 
   return (
@@ -392,7 +425,7 @@ function DayDisk({
     >
       {has ? (
         <span
-          className="absolute inset-px rounded-full bg-[var(--nav-active-bg)] sm:inset-0.5"
+          className={`absolute inset-px rounded-full sm:inset-0.5 ${CALENDAR_INTENSITY_CLASS[intensity]}`}
           aria-hidden
         />
       ) : null}
