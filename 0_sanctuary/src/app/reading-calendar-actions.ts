@@ -10,11 +10,27 @@ import {
 } from "@/lib/user-timezone";
 import { createClient } from "@/lib/supabase/server";
 
-const MIN_YEAR = 2026;
-const MIN_MONTH = 1;
+const PRODUCT_MIN_YEAR = 2026;
 
 function monthOrdinal(year: number, month: number): number {
   return year * 12 + month - 1;
+}
+
+function resolveMinCalendarYear(
+  timeZone: string,
+  accountCreatedAt: string | undefined,
+): { minYear: number; minMonth: number } {
+  if (!accountCreatedAt) {
+    return { minYear: PRODUCT_MIN_YEAR, minMonth: 1 };
+  }
+  const start = new Date(accountCreatedAt);
+  return {
+    minYear: Math.max(
+      PRODUCT_MIN_YEAR,
+      getCalendarYearInTimeZone(start, timeZone),
+    ),
+    minMonth: getCalendarMonthInTimeZone(start, timeZone),
+  };
 }
 
 /**
@@ -41,6 +57,10 @@ export async function getReadingMonthDayCounts(
   }
 
   const timeZone = await getUserTimezone(supabase, user.id);
+  const { minYear, minMonth } = resolveMinCalendarYear(
+    timeZone,
+    user.created_at,
+  );
   const now = new Date();
   const maxNav = addCalendarMonths(
     getCalendarYearInTimeZone(now, timeZone),
@@ -48,7 +68,7 @@ export async function getReadingMonthDayCounts(
     36,
   );
 
-  const minOrd = monthOrdinal(MIN_YEAR, MIN_MONTH);
+  const minOrd = monthOrdinal(minYear, minMonth);
   const maxOrd = monthOrdinal(maxNav.year, maxNav.month);
   const reqOrd = monthOrdinal(year, month);
   if (reqOrd < minOrd || reqOrd > maxOrd) {

@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { ActivityPopup } from "./ActivityPopup";
 import { BottomNav } from "./BottomNav";
 import { NavigationLoadingOverlay } from "./NavigationLoadingOverlay";
+import { ActivityQueueProvider } from "@/lib/ActivityQueueProvider";
 
 type ShellInnerProps = PropsWithChildren<{
   immersiveVocab: boolean;
@@ -15,8 +16,6 @@ type ShellInnerProps = PropsWithChildren<{
 
 function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
   const pathname = usePathname();
-
-  const practiceChat = pathname.startsWith("/writing/practice");
 
   const hideNav =
     pathname.startsWith("/login") ||
@@ -26,7 +25,9 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
 
   const chromeHidden = hideNav || immersiveVocab;
 
-  const onMainSettingsHub = pathname === "/settings";
+  const onMainSettingsHub = pathname === "/settings" || pathname.startsWith("/settings/");
+
+  const mainMaxWidth = onMainSettingsHub ? "max-w-3xl" : "max-w-md";
 
   const hasBottomTabStack =
     !chromeHidden &&
@@ -37,19 +38,18 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
     ? immersiveVocab
       ? "pb-6 pt-[max(1rem,env(safe-area-inset-top))]"
       : "pb-10 pt-10"
-    : practiceChat
-      ? "pb-10 pt-10"
-      : hasBottomTabStack
-        ? "pb-40 pt-10"
-        : "pb-28 pt-10";
+    : hasBottomTabStack
+      ? "pb-40 pt-10"
+      : "pb-28 pt-10";
 
   const showGlobalChrome = !hideNav;
 
   return (
     <div className="min-h-dvh bg-[var(--background)] text-[var(--foreground)]">
-      <NavigationLoadingOverlay />
-      {showGlobalChrome ? <ActivityPopup /> : null}
-      {!chromeHidden && !onMainSettingsHub && !practiceChat ? (
+      <ActivityQueueProvider>
+        <NavigationLoadingOverlay />
+        {showGlobalChrome ? <ActivityPopup /> : null}
+      {!chromeHidden && !onMainSettingsHub ? (
         <Link
           href="/settings"
           className="fixed right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-[60] rounded-full border border-[var(--border-default)] bg-[var(--chrome-fab-bg)] p-2.5 text-[var(--nav-idle-text)] shadow-sm backdrop-blur transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--chrome-fab-hover)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]/20"
@@ -58,10 +58,11 @@ function AppShellInner({ children, immersiveVocab }: ShellInnerProps) {
           <Settings className="h-5 w-5 shrink-0" aria-hidden />
         </Link>
       ) : null}
-      <main className={`mx-auto w-full max-w-md px-6 ${mainPadding}`}>
+      <main className={`mx-auto w-full ${mainMaxWidth} px-6 ${mainPadding}`}>
         {children}
       </main>
-      {chromeHidden || practiceChat ? null : <BottomNav />}
+      {chromeHidden ? null : <BottomNav />}
+      </ActivityQueueProvider>
     </div>
   );
 }

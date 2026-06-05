@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { LibraryList } from "./LibraryList";
 import type { LibraryItem } from "../_data/library";
 import { createClient } from "@/lib/supabase/server";
@@ -54,5 +55,9 @@ export async function LibraryPageContent() {
     };
   });
 
-  return <LibraryList items={items} />;
+  return (
+    <Suspense fallback={<p className="mt-6 animate-pulse text-[var(--text-muted)]">Loading…</p>}>
+      <LibraryList items={items} />
+    </Suspense>
+  );
 }

@@ -20,6 +20,8 @@ export type ReadingCalendarModel = {
   minMonth: number;
   maxYear: number;
   maxMonth: number;
+  /** Preloaded day counts for the initial visible month (avoids duplicate fetch). */
+  initialMonthCounts?: Record<string, number>;
 };
 
 const MONTH_NAMES = [
@@ -143,7 +145,14 @@ export function ReadingYearCalendar({ model }: Props) {
     minMonth,
     maxYear,
     maxMonth,
+    initialMonthCounts,
   } = model;
+
+  const initialMonthKey = monthKey(initialYear, initialMonth);
+  const seededInitialCache =
+    initialMonthCounts && Object.keys(initialMonthCounts).length > 0
+      ? { [initialMonthKey]: initialMonthCounts }
+      : {};
 
   const months = useMemo(
     () => enumerateMonths(minYear, minMonth, maxYear, maxMonth),
@@ -164,9 +173,11 @@ export function ReadingYearCalendar({ model }: Props) {
 
   const [monthCache, setMonthCache] = useState<
     Record<string, Record<string, number>>
-  >({});
+  >(() => seededInitialCache);
   /** Month key is only added after a successful fetch (avoids “stuck empty” if user navigates away mid-request). */
-  const loadedRef = useRef<Set<string>>(new Set());
+  const loadedRef = useRef<Set<string>>(
+    new Set(Object.keys(seededInitialCache)),
+  );
   const inFlightRef = useRef<Set<string>>(new Set());
 
   const scrollToIndex = useCallback(
@@ -408,6 +419,10 @@ function DayDisk({
 }) {
   const intensity = readIntensityLevel(count);
   const has = intensity > 0;
+  const intensityClass =
+    intensity >= 1
+      ? CALENDAR_INTENSITY_CLASS[intensity as 1 | 2 | 3 | 4]
+      : "";
   const isToday = todayDateKey && dateKey === todayDateKey;
 
   return (
@@ -425,7 +440,7 @@ function DayDisk({
     >
       {has ? (
         <span
-          className={`absolute inset-px rounded-full sm:inset-0.5 ${CALENDAR_INTENSITY_CLASS[intensity]}`}
+          className={`absolute inset-px rounded-full sm:inset-0.5 ${intensityClass}`}
           aria-hidden
         />
       ) : null}

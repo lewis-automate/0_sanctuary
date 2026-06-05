@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { AppThemePreference } from "@/lib/app-theme";
 import { FadeIn } from "./FadeIn";
 import { InteractiveStory } from "./InteractiveStory";
 import { ReaderControls, type FontSize } from "./ReaderControls";
+import {
+  readerThemeFabClass,
+  ThemeToggleButton,
+} from "./ThemeToggleButton";
 import type { Story } from "../_data/stories";
 
 type Props = {
@@ -12,6 +17,7 @@ type Props = {
   message?: string;
   targetLanguage?: string;
   nativeLanguage?: string;
+  appTheme?: AppThemePreference;
 };
 
 export function ReaderContent({
@@ -19,12 +25,19 @@ export function ReaderContent({
   message,
   targetLanguage = "",
   nativeLanguage = "",
+  appTheme,
 }: Props) {
   const [fontSize, setFontSize] = useState<FontSize>("md");
 
   if (!story) {
     return (
-      <FadeIn className="mx-auto w-full max-w-prose text-center">
+      <FadeIn className="relative mx-auto w-full max-w-prose text-center">
+        {appTheme ? (
+          <ThemeToggleButton
+            initialTheme={appTheme}
+            className={`${readerThemeFabClass} absolute right-0 top-0`}
+          />
+        ) : null}
         <p className="text-[var(--text-muted)]">
           {message ?? "No story found."}
         </p>
@@ -41,6 +54,12 @@ export function ReaderContent({
   return (
     <div className="relative">
       <ReaderControls fontSize={fontSize} onFontSizeChange={setFontSize} />
+      {appTheme ? (
+        <ThemeToggleButton
+          initialTheme={appTheme}
+          className={`${readerThemeFabClass} absolute right-0 top-0`}
+        />
+      ) : null}
 
       <FadeIn className="mx-auto w-full max-w-prose">
         <header className="text-center">

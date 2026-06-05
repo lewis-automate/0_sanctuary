@@ -8,7 +8,8 @@ import {
   SubNavTabBar,
   subNavTabButtonClass,
 } from "../_components/SubNavTabBar";
-import { FeedbackSection } from "../vocab/FeedbackSection";
+import type { FeedbackListItem } from "@/lib/load-feedback-items";
+import { FeedbackSection } from "./FeedbackSection";
 
 const tabs = [
   { id: "thoughts" as const, Icon: NotebookText, label: "Thoughts" },
@@ -18,20 +19,21 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"];
 
 function tabToSearchParam(id: TabId): string {
-  return id === "write-now" ? "writenow" : "thoughts";
+  return id === "write-now" ? "write-now" : "thoughts";
 }
 
 function searchParamToTab(raw: string | null): TabId | null {
-  if (raw === "writenow") return "write-now";
+  if (raw === "write-now" || raw === "writenow") return "write-now";
   if (raw === "thoughts") return "thoughts";
   return null;
 }
 
 type WritingTabsProps = {
   initialTab?: TabId;
+  initialFeedbackItems?: FeedbackListItem[];
 };
 
-export function WritingTabs({ initialTab }: WritingTabsProps) {
+export function WritingTabs({ initialTab, initialFeedbackItems }: WritingTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(
@@ -57,9 +59,10 @@ export function WritingTabs({ initialTab }: WritingTabsProps) {
         {activeTab === "thoughts" && (
           <>
             <p className="mb-4 text-center text-sm italic leading-relaxed text-[var(--text-muted)]">
-              Read feedback on your writing in your native tongue and start a review session with a tutor.
+              Read notes on your writing, then mark each piece reviewed when
+              you&apos;re done.
             </p>
-            <FeedbackSection hideSectionTitle />
+            <FeedbackSection initialItems={initialFeedbackItems} />
           </>
         )}
         {activeTab === "write-now" && <FreeWriterPanel />}

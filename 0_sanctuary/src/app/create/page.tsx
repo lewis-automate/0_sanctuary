@@ -128,7 +128,7 @@ export default function CreatePage() {
   };
 
   return (
-    <FadeIn className="mx-auto w-full max-w-prose">
+    <FadeIn variant="tab" className="mx-auto w-full max-w-prose">
       <header className="mb-6 text-center">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           Create Reading Material
@@ -330,6 +330,12 @@ export default function CreatePage() {
               Check your library for progress. You can submit again in{" "}
               <span className="font-medium tabular-nums">{countdown}</span>s.
             </p>
+            <Link
+              href="/library"
+              className="mt-4 inline-flex w-full items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] transition-opacity hover:opacity-90"
+            >
+              Go to Library
+            </Link>
           </div>
         </div>
       )}

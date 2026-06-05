@@ -38,26 +38,19 @@ export async function queueStoryGeneration(payload: StoryGenPayload): Promise<
   const n8nUrl = process.env.NEXT_PUBLIC_N8N_MAIN_WEBHOOK_URL;
   const webhookPayload = { job_id: row.id, user_id: user.id, event_type: "story_gen" };
 
-  console.log("[queueStoryGeneration] NEXT_PUBLIC_N8N_MAIN_WEBHOOK_URL set:", !!n8nUrl);
   if (n8nUrl) {
-    console.log("[queueStoryGeneration] Webhook URL (first 60 chars):", n8nUrl.slice(0, 60) + (n8nUrl.length > 60 ? "…" : ""));
-    console.log("[queueStoryGeneration] Sending payload:", webhookPayload);
     try {
       const res = await fetch(n8nUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(webhookPayload),
       });
-      const resText = await res.text();
-      console.log("[queueStoryGeneration] Webhook response status:", res.status, "body:", resText.slice(0, 200));
       if (!res.ok) {
-        console.error("[queueStoryGeneration] n8n webhook failed:", res.status, resText);
+        console.error("[queueStoryGeneration] n8n webhook failed:", res.status);
       }
     } catch (err) {
       console.error("[queueStoryGeneration] n8n webhook error:", err);
     }
-  } else {
-    console.log("[queueStoryGeneration] Skipping webhook (NEXT_PUBLIC_N8N_MAIN_WEBHOOK_URL not set)");
   }
 
   return { ok: true, jobId: row.id };

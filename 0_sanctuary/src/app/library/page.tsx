@@ -5,7 +5,7 @@ import { LibraryPageContent } from "./LibraryPageContent";
 
 export default function LibraryPage() {
   return (
-    <FadeIn className="mx-auto w-full max-w-prose">
+    <FadeIn variant="tab" className="mx-auto w-full max-w-prose">
       <header className="mb-3 text-center sm:text-left">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
           Library

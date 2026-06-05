@@ -1,12 +1,11 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Languages, Lightbulb } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -19,10 +18,8 @@ import {
 } from "@/lib/nudge-text-selection";
 import {
   isReaderGrammarSelectionWithinLimit,
-  isReaderTranslateSelectionWithinLimit,
   isReaderVocabSelectionWithinLimit,
   MAX_READER_GRAMMAR_SELECTION_GRAPHEMES,
-  MAX_READER_TRANSLATE_SELECTION_GRAPHEMES,
   MAX_READER_VOCAB_SELECTION_GRAPHEMES,
 } from "@/lib/reader-selection-limit";
 
@@ -39,7 +36,7 @@ const READER_AI_WAIT_HINT = "Wait a moment...";
 type Props = {
   story: Story;
   fontSize?: FontSize;
-  /** From profile; both required for translate */
+  /** From profile; both required for grammar help */
   targetLanguage?: string;
   nativeLanguage?: string;
 };
@@ -66,22 +63,8 @@ function buildSelectionContext(storyBody: string, highlighted: string): string {
 }
 
 type TooltipState = {
-  /** Horizontal center of the selection (viewport px) */
-  centerX: number;
-  top: number;
-  bottom: number;
-  width: number;
   text: string;
 } | null;
-
-type TranslateAnchor = {
-  centerX: number;
-  top: number;
-  bottom: number;
-  width: number;
-};
-
-const TEXT_MARGIN_PX = 8;
 
 const TOOLBAR_CLUSTER =
   "flex shrink-0 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-inner";
@@ -92,20 +75,6 @@ const TOOLBAR_ICON_BTN =
 const TOOLBAR_SAVE_BTN =
   "inline-flex h-10 min-w-[3.5rem] shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] px-3 text-xs font-semibold tracking-wide text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
 
-function clampLeftForCenteredWidth(
-  centerX: number,
-  width: number,
-  bounds: DOMRect,
-  margin: number,
-): number {
-  const half = width / 2;
-  const idealLeft = centerX - half;
-  const minL = bounds.left + margin;
-  const maxL = bounds.right - margin - width;
-  if (maxL < minL) return minL;
-  return Math.min(Math.max(idealLeft, minL), maxL);
-}
-
 export function InteractiveStory({
   story,
   fontSize = "md",
@@ -114,21 +83,11 @@ export function InteractiveStory({
 }: Props) {
   const router = useRouter();
   const [tooltip, setTooltip] = useState<TooltipState>(null);
-  const [translateOpen, setTranslateOpen] = useState(false);
-  const [translateLoading, setTranslateLoading] = useState(false);
-  const [translateText, setTranslateText] = useState("");
-  const [translateSynonym, setTranslateSynonym] = useState("");
-  const [translateError, setTranslateError] = useState<string | null>(null);
   const [grammarOpen, setGrammarOpen] = useState(false);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarText, setGrammarText] = useState("");
   const [grammarError, setGrammarError] = useState<string | null>(null);
-  const [translateAnchor, setTranslateAnchor] = useState<TranslateAnchor | null>(
-    null,
-  );
-  const [translatePlacement, setTranslatePlacement] = useState<"below" | "above">(
-    "below",
-  );
+  const [grammarHighlight, setGrammarHighlight] = useState("");
   const [savedVocab, setSavedVocab] = useState<string[]>([]);
   /** Floating toast after Save (not shown in the highlight toolbar) */
   const [vocabToast, setVocabToast] = useState<"saved" | "duplicate" | null>(
@@ -140,26 +99,35 @@ export function InteractiveStory({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const translatePopupRef = useRef<HTMLDivElement>(null);
+  const selectionDockRef = useRef<HTMLDivElement>(null);
   const [portalReady, setPortalReady] = useState(false);
-  /** Re-read text-area bounds on scroll/resize while overlays are open */
-  const [layoutTick, setLayoutTick] = useState(0);
 
   useEffect(() => {
     setPortalReady(true);
   }, []);
 
-  useEffect(() => {
-    if (!tooltip && !translateOpen && !grammarOpen) return;
-    const bump = () => setLayoutTick((n) => n + 1);
-    window.addEventListener("scroll", bump, true);
-    window.addEventListener("resize", bump);
-    return () => {
-      window.removeEventListener("scroll", bump, true);
-      window.removeEventListener("resize", bump);
-    };
-  }, [tooltip, translateOpen, grammarOpen]);
+  const showTooltipFromSelection = useCallback(() => {
+    requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (!selection) return;
+      const text = selection.toString().trim();
+
+      const anchor = selection.anchorNode;
+      if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
+        if (grammarOpen) return;
+        setTooltip(null);
+        return;
+      }
+
+      setTooltip({ text });
+    });
+  }, [grammarOpen]);
+
+  const closeGrammarPanel = useCallback(() => {
+    setGrammarOpen(false);
+    setGrammarError(null);
+    requestAnimationFrame(() => showTooltipFromSelection());
+  }, [showTooltipFromSelection]);
 
   const handleFinishedReading = useCallback(async () => {
     setSaveError(null);
@@ -183,8 +151,9 @@ export function InteractiveStory({
     if (!tooltip) return;
     const dismiss = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
-      if (target && tooltipRef.current?.contains(target)) return;
-      if (target && translatePopupRef.current?.contains(target)) return;
+      if (target && selectionDockRef.current?.contains(target)) return;
+      setGrammarOpen(false);
+      setGrammarError(null);
       setTooltip(null);
       window.getSelection()?.removeAllRanges();
     };
@@ -203,36 +172,6 @@ export function InteractiveStory({
     const id = window.setTimeout(() => setVocabToast(null), 2400);
     return () => window.clearTimeout(id);
   }, [vocabToast]);
-
-  const showTooltipFromSelection = useCallback(() => {
-    // Read after layout so getBoundingClientRect matches the committed selection
-    // (especially important on mobile after drag-to-select).
-    requestAnimationFrame(() => {
-      const selection = window.getSelection();
-      if (!selection) return;
-      const text = selection.toString().trim();
-
-      const anchor = selection.anchorNode;
-      if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
-        // Tapping Translate/Grammar often collapses selection; keep the bar until the panel closes.
-        if (translateOpen || grammarOpen) return;
-        setTooltip(null);
-        return;
-      }
-
-      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-      const rect = range?.getBoundingClientRect();
-      if (!rect) return;
-
-      setTooltip({
-        centerX: rect.left + rect.width / 2,
-        top: rect.top,
-        bottom: rect.bottom,
-        width: rect.width,
-        text,
-      });
-    });
-  }, [translateOpen, grammarOpen]);
 
   // Touches that end on selection handles (common on Android) do not bubble
   // touchend to the article, but selectionchange still fires when the range updates.
@@ -300,28 +239,16 @@ export function InteractiveStory({
     setSavedVocab((prev) => prev.filter((w) => w !== word));
   }, []);
 
-  const translateSelectionWithinLimit = Boolean(
-    tooltip?.text && isReaderTranslateSelectionWithinLimit(tooltip.text),
-  );
   const grammarSelectionWithinLimit = Boolean(
     tooltip?.text && isReaderGrammarSelectionWithinLimit(tooltip.text),
   );
   const vocabSelectionWithinLimit = Boolean(
     tooltip?.text && isReaderVocabSelectionWithinLimit(tooltip.text),
   );
-  const canTranslate =
-    Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
-    Boolean(tooltip?.text) &&
-    translateSelectionWithinLimit;
   const canGrammar =
     Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
     Boolean(tooltip?.text) &&
     grammarSelectionWithinLimit;
-  const translateDisabledTitle = !translateSelectionWithinLimit
-    ? `Selection too long for Translate (max ${MAX_READER_TRANSLATE_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
-    : !targetLanguage.trim() || !nativeLanguage.trim()
-      ? "Add target and native language in Settings"
-      : undefined;
   const grammarDisabledTitle = !grammarSelectionWithinLimit
     ? `Selection too long for Grammar (max ${MAX_READER_GRAMMAR_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
     : !targetLanguage.trim() || !nativeLanguage.trim()
@@ -334,80 +261,22 @@ export function InteractiveStory({
     vocabSelectionWithinLimit &&
     (savedVocab.length < 15 || selectionAlreadyInVocab);
 
-  const handleTranslate = useCallback(async () => {
-    if (!tooltip?.text.trim() || !isReaderTranslateSelectionWithinLimit(tooltip.text))
-      return;
-    setTranslateAnchor({
-      centerX: tooltip.centerX,
-      top: tooltip.top,
-      bottom: tooltip.bottom,
-      width: tooltip.width,
-    });
-    setGrammarOpen(false);
-    setGrammarError(null);
-    setTranslateOpen(true);
-    setTranslateLoading(true);
-    setTranslateError(null);
-    setTranslateText("");
-    setTranslateSynonym("");
-    const context = buildSelectionContext(story.body, tooltip.text);
-    try {
-      const res = await fetch("/api/translate-selection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: tooltip.text,
-          context,
-        }),
-      });
-      const data = (await res.json()) as {
-        translation?: unknown;
-        synonym?: unknown;
-        error?: string;
-      };
-      if (!res.ok) {
-        setTranslateError(data.error ?? "Translation failed");
-        return;
-      }
-      const raw =
-        typeof data.translation === "string" ? data.translation.trim() : "";
-      const syn =
-        typeof data.synonym === "string" ? data.synonym.trim() : "";
-      if (raw) {
-        setTranslateText(raw);
-        setTranslateSynonym(syn);
-      } else {
-        setTranslateError("No translation returned");
-      }
-    } catch {
-      setTranslateError("Could not reach translator");
-    } finally {
-      setTranslateLoading(false);
-    }
-  }, [story.body, tooltip]);
-
   const handleGrammar = useCallback(async () => {
     if (!tooltip?.text.trim() || !isReaderGrammarSelectionWithinLimit(tooltip.text))
       return;
-    setTranslateAnchor({
-      centerX: tooltip.centerX,
-      top: tooltip.top,
-      bottom: tooltip.bottom,
-      width: tooltip.width,
-    });
-    setTranslateOpen(false);
-    setTranslateError(null);
+    const highlight = tooltip.text;
+    setGrammarHighlight(highlight);
     setGrammarOpen(true);
     setGrammarLoading(true);
     setGrammarError(null);
     setGrammarText("");
-    const context = buildSelectionContext(story.body, tooltip.text);
+    const context = buildSelectionContext(story.body, highlight);
     try {
       const res = await fetch("/api/grammar-selection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: tooltip.text,
+          text: highlight,
           context,
         }),
       });
@@ -432,46 +301,6 @@ export function InteractiveStory({
       setGrammarLoading(false);
     }
   }, [story.body, tooltip]);
-
-  useLayoutEffect(() => {
-    if ((!translateOpen && !grammarOpen) || !translateAnchor) return;
-    const el = translatePopupRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      const h = el.getBoundingClientRect().height;
-      const gap = 8;
-      const spaceBelow = window.innerHeight - translateAnchor.bottom - gap;
-      const spaceAbove = translateAnchor.top - gap;
-      if (spaceBelow >= h) {
-        setTranslatePlacement("below");
-      } else if (spaceAbove >= h) {
-        setTranslatePlacement("above");
-      } else {
-        setTranslatePlacement(spaceAbove > spaceBelow ? "above" : "below");
-      }
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [
-    translateOpen,
-    grammarOpen,
-    translateAnchor,
-    translateLoading,
-    grammarLoading,
-    translateText,
-    translateSynonym,
-    translateError,
-    grammarText,
-    grammarError,
-  ]);
 
   return (
     <>
@@ -604,276 +433,180 @@ export function InteractiveStory({
         createPortal(
           <>
             <AnimatePresence>
-              {tooltip && (
-                <div
-                  ref={tooltipRef}
-                  className="fixed z-50 before:pointer-events-auto before:absolute before:inset-[-16px] before:z-0 before:rounded-full before:content-['']"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  style={{
-                    left: "50%",
-                    top: tooltip.top - 8,
-                    transform: "translate(-50%, -100%)",
-                  }}
+              {grammarOpen && tooltip && (
+                <motion.div
+                  key="reader-grammar-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[54] bg-black/25"
+                  aria-hidden
                 >
-                  {/* Inner full-bleed layer: flex gaps can miss hit-testing; this catches mousedown behind the row. */}
-                  <motion.div
-                    className="relative z-10 rounded-full border border-[var(--border-default)] bg-[var(--surface-panel)]/90 p-2 shadow-lg ring-1 ring-[var(--border-default)] backdrop-blur-sm"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{
-                      opacity: 0,
-                      scale: 1.15,
-                      transition: { duration: 0.2, ease: "easeOut" },
-                    }}
-                  >
-                    <div
-                      className="pointer-events-auto absolute inset-0 z-0 rounded-full bg-[var(--surface-panel)]/90"
-                      aria-hidden
-                    />
-                    <div className="relative z-10 flex min-w-0 items-center">
-                    {/* Spacers instead of flex gap so clicks in “between” hit a real node (gap can pass through). */}
-                    <div className={TOOLBAR_CLUSTER}>
-                      <button
-                        type="button"
-                        title="Remove one character from the right"
-                        aria-label="Remove one character from the right side of the selection"
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleNudgeSelectionLeft();
-                        }}
-                        className={TOOLBAR_ICON_BTN}
-                      >
-                        <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
-                      </button>
-                    </div>
-                    <div className="w-3 shrink-0 self-stretch" aria-hidden />
-                    <div className={`${TOOLBAR_CLUSTER} flex items-center`}>
-                      <button
-                        type="button"
-                        disabled={!canTranslate}
-                        title={translateDisabledTitle ?? "Translate"}
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleTranslate();
-                        }}
-                        className={TOOLBAR_ICON_BTN}
-                        aria-label="Translate"
-                      >
-                        <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
-                      </button>
-                      <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
-                      <button
-                        type="button"
-                        title={
-                          !vocabSelectionWithinLimit
-                            ? `Selection too long for Save (max ${MAX_READER_VOCAB_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
-                            : savedVocab.length >= 15 && !selectionAlreadyInVocab
-                              ? "Saved vocab limit reached (15)"
-                              : selectionAlreadyInVocab
-                                ? "Already in your list"
-                                : "Save to vocab list"
-                        }
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSaveVocab();
-                        }}
-                        disabled={!canSaveToVocab}
-                        className={TOOLBAR_SAVE_BTN}
-                        aria-label="Save to vocab list"
-                      >
-                        Save
-                      </button>
-                      <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
-                      <button
-                        type="button"
-                        disabled={!canGrammar}
-                        title={grammarDisabledTitle ?? "Grammar explanation"}
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleGrammar();
-                        }}
-                        className={TOOLBAR_ICON_BTN}
-                        aria-label="Grammar explanation"
-                      >
-                        <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
-                      </button>
-                    </div>
-                    <div className="w-3 shrink-0 self-stretch" aria-hidden />
-                    <div className={TOOLBAR_CLUSTER}>
-                      <button
-                        type="button"
-                        title="Add one character on the right"
-                        aria-label="Add one character to the right side of the selection"
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleNudgeSelectionRight();
-                        }}
-                        className={TOOLBAR_ICON_BTN}
-                      >
-                        <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
-                      </button>
-                    </div>
-                    </div>
-                  </motion.div>
-                </div>
+                  <button
+                    type="button"
+                    className="absolute inset-0"
+                    aria-label="Close grammar panel"
+                    onClick={closeGrammarPanel}
+                  />
+                </motion.div>
               )}
             </AnimatePresence>
 
             <AnimatePresence>
-              {(translateOpen || grammarOpen) && translateAnchor && (
+              {tooltip && (
                 <motion.div
-                  key="reader-ai-popover"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[54]"
-                  aria-hidden={!(translateOpen || grammarOpen)}
+                  key="reader-selection-dock"
+                  ref={selectionDockRef}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 12 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  className="fixed inset-x-0 bottom-0 z-[55] mx-auto w-full max-w-md px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 >
-                  <button
-                    type="button"
-                    className="absolute inset-0 bg-black/25"
-                    aria-label="Close panel"
-                    onClick={() => {
-                      setTranslateOpen(false);
-                      setTranslateError(null);
-                      setGrammarOpen(false);
-                      setGrammarError(null);
-                      setTranslateAnchor(null);
-                      requestAnimationFrame(() => showTooltipFromSelection());
-                    }}
-                  />
-                  {/* Horizontally clamped to the story text column (not full viewport). */}
-                  <div
-                    ref={translatePopupRef}
-                    style={(() => {
-                      void layoutTick;
-                      const vw =
-                        typeof window !== "undefined" ? window.innerWidth : 400;
-                      const bounds = containerRef.current?.getBoundingClientRect();
-                      let panelWidth = Math.min(
-                        Math.max(translateAnchor.width + 48, 200),
-                        Math.min(vw * 0.92, 640),
-                      );
-                      let left: number;
-                      if (bounds) {
-                        const innerMax = bounds.width - 2 * TEXT_MARGIN_PX;
-                        if (innerMax > 0) {
-                          panelWidth = Math.min(panelWidth, innerMax);
-                        }
-                        left = clampLeftForCenteredWidth(
-                          translateAnchor.centerX,
-                          panelWidth,
-                          bounds,
-                          TEXT_MARGIN_PX,
-                        );
-                      } else {
-                        left = Math.min(
-                          Math.max(translateAnchor.centerX - panelWidth / 2, 8),
-                          Math.max(8, vw - panelWidth - 8),
-                        );
-                      }
-                      return {
-                        position: "fixed" as const,
-                        left,
-                        width: panelWidth,
-                        zIndex: 55,
-                        ...(translatePlacement === "below"
-                          ? { top: translateAnchor.bottom + 8 }
-                          : {
-                              bottom:
-                                typeof window !== "undefined"
-                                  ? window.innerHeight - translateAnchor.top + 8
-                                  : undefined,
-                            }),
-                      };
-                    })()}
-                    className="flex max-h-[min(50vh,28rem)] flex-col overflow-hidden"
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.96 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{ type: "spring", stiffness: 520, damping: 32 }}
-                      style={{ transformOrigin: "top center" }}
-                      className="flex max-h-[min(50vh,28rem)] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--reader-border-muted)] bg-[var(--reader-surface)] shadow-2xl backdrop-blur-xl"
-                    >
-                      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-default)] px-4 py-3">
-                        <span className="text-sm font-semibold text-[var(--foreground)]">
-                          {translateOpen ? "Translation" : "Grammar"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTranslateOpen(false);
-                            setTranslateError(null);
-                            setGrammarOpen(false);
-                            setGrammarError(null);
-                            setTranslateAnchor(null);
-                            requestAnimationFrame(() => showTooltipFromSelection());
-                          }}
-                          className="rounded-full px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)]"
+                  <div className="overflow-hidden rounded-t-2xl border border-[var(--reader-border-muted)] bg-[var(--reader-surface)] shadow-2xl backdrop-blur-xl">
+                    <AnimatePresence initial={false}>
+                      {grammarOpen && (
+                        <motion.div
+                          key="reader-grammar-panel"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                          className="overflow-hidden border-b border-[var(--border-default)]"
                         >
-                          Close
-                        </button>
-                      </div>
-                      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-2">
-                        {translateOpen && translateLoading && (
-                          <div className="space-y-1">
-                            <p className="text-sm text-[var(--text-muted)]">
-                              Translating…
-                            </p>
-                            <p className="text-xs text-[var(--field-placeholder)]">
-                              {READER_AI_WAIT_HINT}
-                            </p>
-                          </div>
-                        )}
-                        {grammarOpen && grammarLoading && (
-                          <div className="space-y-1">
-                            <p className="text-sm text-[var(--text-muted)]">
-                              Getting a grammar note…
-                            </p>
-                            <p className="text-xs text-[var(--field-placeholder)]">
-                              {READER_AI_WAIT_HINT}
-                            </p>
-                          </div>
-                        )}
-                        {translateOpen && !translateLoading && translateError && (
-                          <p className="text-sm text-[var(--semantic-danger-inline)]">{translateError}</p>
-                        )}
-                        {grammarOpen && !grammarLoading && grammarError && (
-                          <p className="text-sm text-[var(--semantic-danger-inline)]">{grammarError}</p>
-                        )}
-                        {translateOpen &&
-                          !translateLoading &&
-                          !translateError &&
-                          translateText && (
-                            <div className="space-y-2">
-                              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
-                                {translateText}
-                              </p>
-                              {translateSynonym ? (
-                                <p className="text-sm leading-relaxed text-[var(--prose-text)]">
-                                  {translateSynonym}
+                          <div className="flex max-h-[min(45vh,28rem)] flex-col">
+                            <div className="flex shrink-0 items-start justify-between gap-3 px-4 py-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-[var(--foreground)]">
+                                  Grammar
                                 </p>
-                              ) : null}
+                                {grammarHighlight ? (
+                                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--text-muted)]">
+                                    “{grammarHighlight}”
+                                  </p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={closeGrammarPanel}
+                                className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)]"
+                              >
+                                Close
+                              </button>
                             </div>
-                          )}
-                        {grammarOpen &&
-                          !grammarLoading &&
-                          !grammarError &&
-                          grammarText && (
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
-                              {grammarText}
-                            </p>
-                          )}
+                            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
+                              {grammarLoading && (
+                                <div className="space-y-1">
+                                  <p className="text-sm text-[var(--text-muted)]">
+                                    Getting a grammar note…
+                                  </p>
+                                  <p className="text-xs text-[var(--field-placeholder)]">
+                                    {READER_AI_WAIT_HINT}
+                                  </p>
+                                </div>
+                              )}
+                              {!grammarLoading && grammarError && (
+                                <p className="text-sm text-[var(--semantic-danger-inline)]">
+                                  {grammarError}
+                                </p>
+                              )}
+                              {!grammarLoading && !grammarError && grammarText && (
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
+                                  {grammarText}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="flex justify-center p-2">
+                      <div className="relative flex min-w-0 items-center justify-center">
+                        <div className={TOOLBAR_CLUSTER}>
+                          <button
+                            type="button"
+                            title="Remove one character from the right"
+                            aria-label="Remove one character from the right side of the selection"
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNudgeSelectionLeft();
+                            }}
+                            className={TOOLBAR_ICON_BTN}
+                          >
+                            <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+                          </button>
+                        </div>
+                        <div className="w-3 shrink-0 self-stretch" aria-hidden />
+                        <div className={`${TOOLBAR_CLUSTER} flex items-center`}>
+                          <button
+                            type="button"
+                            title={
+                              !vocabSelectionWithinLimit
+                                ? `Selection too long for Save (max ${MAX_READER_VOCAB_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+                                : savedVocab.length >= 15 && !selectionAlreadyInVocab
+                                  ? "Saved vocab limit reached (15)"
+                                  : selectionAlreadyInVocab
+                                    ? "Already in your list"
+                                    : "Save to vocab list"
+                            }
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSaveVocab();
+                            }}
+                            disabled={!canSaveToVocab}
+                            className={TOOLBAR_SAVE_BTN}
+                            aria-label="Save to vocab list"
+                          >
+                            Save
+                          </button>
+                          <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
+                          <button
+                            type="button"
+                            disabled={!canGrammar}
+                            title={grammarDisabledTitle ?? "Grammar explanation"}
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (grammarOpen) {
+                                closeGrammarPanel();
+                                return;
+                              }
+                              void handleGrammar();
+                            }}
+                            className={`${TOOLBAR_SAVE_BTN} ${
+                              grammarOpen
+                                ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                                : ""
+                            }`}
+                            aria-label="Grammar"
+                            aria-pressed={grammarOpen}
+                          >
+                            Grammar
+                          </button>
+                        </div>
+                        <div className="w-3 shrink-0 self-stretch" aria-hidden />
+                        <div className={TOOLBAR_CLUSTER}>
+                          <button
+                            type="button"
+                            title="Add one character on the right"
+                            aria-label="Add one character to the right side of the selection"
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNudgeSelectionRight();
+                            }}
+                            className={TOOLBAR_ICON_BTN}
+                          >
+                            <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
+                          </button>
+                        </div>
                       </div>
-                    </motion.div>
+                    </div>
                   </div>
                 </motion.div>
               )}

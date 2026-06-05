@@ -2,10 +2,13 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Maximize2, Minimize2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { queueWriteNowSubmission } from "@/app/writing/actions";
+import { StatusBanner } from "./StatusBanner";
 
 const MAX_CHARS = 500;
+const DRAFT_STORAGE_KEY = "sanctuary-write-now-draft";
 
 /** Same easing as Create “More options” panel. */
 const PANEL_EASE = [0.83, 0, 0.17, 1] as const;
@@ -27,6 +30,7 @@ const textareaFullscreenClass = `${textareaBase} min-h-0 flex-1 resize-none`;
 
 /** Free-form writing mockup (textarea + send confirmation). */
 export function FreeWriterPanel() {
+  const router = useRouter();
   const shouldReduceMotion = useReducedMotion();
   const titleId = useId();
   const fieldId = useId();
@@ -39,10 +43,59 @@ export function FreeWriterPanel() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [submitConfirmed, setSubmitConfirmed] = useState(false);
+  const [practiceFocus, setPracticeFocus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/feedback-items");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          items?: {
+            reviewed: boolean;
+            focus_point: string | null;
+          }[];
+        };
+        const next = (data.items ?? []).find(
+          (item) => !item.reviewed && item.focus_point?.trim(),
+        );
+        if (!cancelled && next?.focus_point) {
+          setPracticeFocus(next.focus_point.trim());
+        }
+      } catch {
+        /* optional hint */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const panelTransition = shouldReduceMotion
     ? { duration: 0.18 * 1.3, ease: "easeOut" as const }
     : { duration: PANEL_DURATION, ease: PANEL_EASE };
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) setText(saved.slice(0, MAX_CHARS));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (text.trim()) {
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, text);
+      } else {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [text]);
 
   useEffect(() => {
     if (!submitConfirmed) return;
@@ -76,9 +129,14 @@ export function FreeWriterPanel() {
         return;
       }
       setText("");
+      try {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
       setSendDialogOpen(false);
       if (fullscreen) setFullscreen(false);
-      setSubmitConfirmed(true);
+      router.push("/writing?tab=thoughts");
     } finally {
       setSendBusy(false);
     }
@@ -120,13 +178,16 @@ export function FreeWriterPanel() {
             className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-5 sm:p-6"
           >
             {submitConfirmed ? (
-              <div
-                className="mb-4 rounded-2xl border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-4 py-3 text-sm leading-relaxed text-[var(--semantic-success-text)]"
-                role="status"
-                aria-live="polite"
-              >
-                Sent. Your writing was submitted and will appear under current
-                activities.
+              <StatusBanner variant="success" className="mb-4">
+                Sent. Check Thoughts for feedback when it&apos;s ready.
+              </StatusBanner>
+            ) : null}
+            {practiceFocus ? (
+              <div className="mb-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm leading-relaxed text-[var(--prose-text)]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Focus for this session
+                </p>
+                <p className="mt-1.5">{practiceFocus}</p>
               </div>
             ) : null}
             <div className="mb-3 flex justify-center">

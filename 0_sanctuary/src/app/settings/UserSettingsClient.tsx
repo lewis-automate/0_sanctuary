@@ -6,8 +6,6 @@ import {
   Check,
   ChevronDown,
   Copy,
-  Moon,
-  Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,8 +20,9 @@ import {
 } from "react";
 import { CANCEL_PENDING_NAVIGATION_EVENT } from "../_components/NavigationLoadingOverlay";
 import { LogoutButton } from "../_components/LogoutButton";
+import { ThemeToggleButton } from "../_components/ThemeToggleButton";
+import { StatusBanner } from "../_components/StatusBanner";
 import { UpdatePasswordForm } from "../_components/UpdatePasswordForm";
-import { toHtmlDatasetValue } from "@/lib/app-theme";
 import {
   findDefaultTopicPresetInCategories,
   getDefaultTopicCategoriesForUser,
@@ -596,7 +595,6 @@ export function UserSettingsClient({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [themeToggling, setThemeToggling] = useState(false);
   const [topicPendingDeleteKey, setTopicPendingDeleteKey] = useState<
     string | null
   >(null);
@@ -830,12 +828,6 @@ export function UserSettingsClient({
   isDirtyRef.current = isDirty;
 
   useEffect(() => {
-    document.documentElement.dataset.appTheme = toHtmlDatasetValue(
-      user.app_theme,
-    );
-  }, [user.app_theme]);
-
-  useEffect(() => {
     if (timezoneDefaultAppliedRef.current) return;
     timezoneDefaultAppliedRef.current = true;
     setUser((prev) => {
@@ -1008,39 +1000,15 @@ export function UserSettingsClient({
     }
   };
 
-  const handleThemeToggle = async () => {
-    if (themeToggling) return;
-    const prevTheme = user.app_theme;
-    const nextTheme = prevTheme === "Light" ? "Dark" : "Light";
-    setThemeToggling(true);
-    setSaveError(null);
-    setSaveSuccess(false);
+  const handleThemeSaved = useCallback((nextTheme: UserSettingsProfile["app_theme"]) => {
     setUser((u) => ({ ...u, app_theme: nextTheme }));
-    try {
-      const payload: UserSettingsSavePayload = {
-        user_settings: { ...savedBaseline.user, app_theme: nextTheme },
-        upsert_topics: upsertTopicsFromBaseline(savedBaseline),
-        deleted_ids: [...savedBaseline.deletedIds],
-        settings_trigger: "theme_toggle",
-      };
-      const result = await queueUserSettings(payload);
-      if (!result.ok) {
-        throw new Error(result.error);
-      }
-      setSavedBaseline((b) => ({
-        ...b,
-        user: { ...b.user, app_theme: nextTheme },
-      }));
-      setSaveSuccess(true);
-    } catch (err) {
-      setUser((u) => ({ ...u, app_theme: prevTheme }));
-      setSaveError(
-        err instanceof Error ? err.message : "Could not save theme",
-      );
-    } finally {
-      setThemeToggling(false);
-    }
-  };
+    setSavedBaseline((b) => ({
+      ...b,
+      user: { ...b.user, app_theme: nextTheme },
+    }));
+    setSaveError(null);
+    setSaveSuccess(true);
+  }, []);
 
   const performSaveAll = useCallback(async (): Promise<boolean> => {
     setSaving(true);
@@ -1140,24 +1108,12 @@ export function UserSettingsClient({
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => void handleThemeToggle()}
-            disabled={themeToggling}
+          <ThemeToggleButton
+            initialTheme={user.app_theme}
             className={settingsHeaderFabClass}
-            aria-busy={themeToggling}
-            aria-label={
-              user.app_theme === "Light"
-                ? "Switch to dark mode"
-                : "Switch to light mode"
-            }
-          >
-            {user.app_theme === "Light" ? (
-              <Moon className="h-5 w-5 shrink-0" aria-hidden strokeWidth={2} />
-            ) : (
-              <Sun className="h-5 w-5 shrink-0" aria-hidden strokeWidth={2} />
-            )}
-          </button>
+            onSaved={handleThemeSaved}
+            onError={(message) => setSaveError(message)}
+          />
         </div>
       </header>
 
@@ -1830,27 +1786,7 @@ export function UserSettingsClient({
         </section>
       </div>
 
-      <div
-        role="tabpanel"
-        id={`${tabPanelId}-panel-logout`}
-        aria-labelledby={`${tabPanelId}-tab-logout`}
-        hidden={activeTab !== "logout"}
-        className={activeTab === "logout" ? "" : "hidden"}
-      >
-        <section className={panelClass}>
-          <h2 className="text-base font-semibold text-[var(--foreground)]">
-            Log out
-          </h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Sign out on this device. Unsaved settings changes are discarded.
-          </p>
-          <div className="mt-5">
-            <LogoutButton variant="card" />
-          </div>
-        </section>
-      </div>
-
-      {activeTab !== "password" && activeTab !== "logout" && (
+      {activeTab !== "password" && (
         <section className="mt-2 flex items-center justify-between gap-3">
           <div className="min-h-[1.5rem] text-xs">
             {saveError && (
@@ -1859,9 +1795,9 @@ export function UserSettingsClient({
               </span>
             )}
             {saveSuccess && !saveError && (
-              <span className="text-[var(--semantic-success-inline)]">
+              <StatusBanner variant="success" className="text-xs">
                 Settings saved.
-              </span>
+              </StatusBanner>
             )}
           </div>
           <button
@@ -1879,6 +1815,18 @@ export function UserSettingsClient({
           </button>
         </section>
       )}
+
+      <footer className="mt-8 space-y-4 border-t border-[var(--border-default)] pt-6">
+        <Link
+          href="/settings/updates"
+          className="block text-sm font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--foreground)]"
+        >
+          What&apos;s new
+        </Link>
+        <div data-settings-logout>
+          <LogoutButton variant="card" />
+        </div>
+      </footer>
 
       <AnimatePresence>
         {pendingLeave && (

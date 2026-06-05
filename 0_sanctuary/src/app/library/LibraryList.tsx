@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useActivityQueueProcessingTargets } from "@/lib/useActivityQueueProcessingTargets";
 import type { LibraryItem, LibrarySortKey } from "../_data/library";
 import { sortLibraryItems } from "../_data/library";
@@ -23,15 +24,31 @@ function formatDateYMD(iso: string | null): string {
 }
 
 export function LibraryList({ items: initialItems }: Props) {
+  const searchParams = useSearchParams();
   const { progressStoryIds } = useActivityQueueProcessingTargets();
   const [sortKey, setSortKey] = useState<LibrarySortKey>("created");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [unreadOnly, setUnreadOnly] = useState(true);
+  const [unreadOnly, setUnreadOnly] = useState(
+    () => searchParams.get("show") !== "all",
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get("show") === "all") {
+      setUnreadOnly(false);
+    }
+  }, [searchParams]);
 
   const sorted = sortLibraryItems(initialItems, sortKey, sortDirection);
-  const items = unreadOnly
+  const unreadFiltered = unreadOnly
     ? sorted.filter((i) => i.read_count === 0)
     : sorted;
+  const query = searchQuery.trim().toLowerCase();
+  const items = query
+    ? unreadFiltered.filter((i) =>
+        i.story_title.toLowerCase().includes(query),
+      )
+    : unreadFiltered;
 
   const sortKeys: LibrarySortKey[] = unreadOnly
     ? ["created"]
@@ -91,10 +108,36 @@ export function LibraryList({ items: initialItems }: Props) {
           Unread only
         </label>
       </div>
+      <div className="mt-3">
+        <label className="sr-only" htmlFor="library-search">
+          Search stories
+        </label>
+        <input
+          id="library-search"
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by title…"
+          className="w-full rounded-2xl border border-[var(--field-border)] bg-[var(--field-bg)] px-4 py-2.5 text-sm text-[var(--field-text)] shadow-sm placeholder:text-[var(--field-placeholder)] focus:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-[var(--foreground)]/10"
+        />
+      </div>
 
       <div className="mt-6 space-y-3">
         {initialItems.length === 0 ? (
           <p className="text-center text-[var(--text-muted)]">No stories yet.</p>
+        ) : items.length === 0 && unreadOnly ? (
+          <div className="space-y-3 text-center">
+            <p className="text-[var(--text-muted)]">
+              You&apos;ve read everything in your library.
+            </p>
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(false)}
+              className="rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-semibold text-[var(--nav-active-fg)] transition-opacity hover:opacity-90"
+            >
+              Show all stories
+            </button>
+          </div>
         ) : items.length === 0 ? (
           <p className="text-center text-[var(--text-muted)]">
             No stories match this filter.

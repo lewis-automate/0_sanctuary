@@ -1,16 +1,17 @@
-import { normalizeAppTheme, toHtmlDatasetValue } from "@/lib/app-theme";
+import {
+  normalizeAppTheme,
+  toHtmlDatasetValue,
+  type AppThemePreference,
+} from "@/lib/app-theme";
 import { createClient } from "@/lib/supabase/server";
 
 type HtmlTheme = ReturnType<typeof toHtmlDatasetValue>;
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-/**
- * Loads `app_theme` from user_settings (same fallbacks as settings/page).
- */
-export async function resolveDataAppTheme(
+async function loadAppThemeRow(
   supabase: SupabaseServerClient,
   userId: string,
-): Promise<HtmlTheme> {
+): Promise<Record<string, unknown> | null> {
   let row: Record<string, unknown> | null = null;
 
   const byUserId = await supabase
@@ -45,6 +46,25 @@ export async function resolveDataAppTheme(
     }
   }
 
-  const pref = normalizeAppTheme(row?.app_theme);
-  return toHtmlDatasetValue(pref);
+  return row;
+}
+
+/**
+ * Loads `app_theme` from user_settings (same fallbacks as settings/page).
+ */
+export async function resolveDataAppTheme(
+  supabase: SupabaseServerClient,
+  userId: string,
+): Promise<HtmlTheme> {
+  const row = await loadAppThemeRow(supabase, userId);
+  return toHtmlDatasetValue(normalizeAppTheme(row?.app_theme));
+}
+
+/** Same DB fallbacks as layout SSR; returns Light | Dark for client toggles. */
+export async function resolveAppThemePreference(
+  supabase: SupabaseServerClient,
+  userId: string,
+): Promise<AppThemePreference> {
+  const row = await loadAppThemeRow(supabase, userId);
+  return normalizeAppTheme(row?.app_theme);
 }

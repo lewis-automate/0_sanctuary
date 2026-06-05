@@ -1,87 +1,16 @@
-import { randomUUID } from "crypto";
 import type { UserSettingsProfile } from "./actions";
 import { parseSettingsTab } from "./settings-tabs";
 import { UserSettingsClient } from "./UserSettingsClient";
-import { normalizeAppTheme } from "@/lib/app-theme";
-import { createClient } from "@/lib/supabase/server";
+import {
+  loadUserSettingsProfile,
+  loadUserTopicsForSave,
+} from "@/lib/user-settings-profile";
+import { getAuthenticatedUser } from "@/lib/supabase/get-user";
 
 type PageProps = {
   searchParams?:
     | Promise<{ message?: string; tab?: string }>
     | { message?: string; tab?: string };
-};
-
-function coerceVocabChunkingToBoolean(value: unknown): boolean {
-  if (value === true) return true;
-  if (value === false) return false;
-  if (typeof value === "string") {
-    const lower = value.toLowerCase();
-    if (lower === "true" || lower === "on") return true;
-    if (lower === "false" || lower === "off") return false;
-  }
-  return false;
-}
-
-function coerceLastStoriesFilter(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(99, Math.trunc(n)));
-}
-
-function coerceWordTarget(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.trunc(n);
-}
-
-function mapRowToUserProfile(
-  row: Record<string, unknown>,
-  source: "user_settings" | "users",
-): UserSettingsProfile {
-  const username =
-    source === "users"
-      ? String(row.name ?? row.username ?? "")
-      : String(row.username ?? row.name ?? "");
-
-  const levelRaw =
-    (typeof row.reading_level_desc === "string"
-      ? row.reading_level_desc
-      : null) ??
-    (typeof row.difficulty === "string" ? row.difficulty : null);
-  const difficulty =
-    typeof levelRaw === "string" && levelRaw.trim() !== ""
-      ? levelRaw.trim()
-      : null;
-
-  return {
-    username,
-    target_language: String(row.target_language ?? ""),
-    native_language: String(row.native_language ?? ""),
-    timezone: String(row.timezone ?? ""),
-    difficulty,
-    word_target: coerceWordTarget(row.word_target),
-    last_stories_filter: coerceLastStoriesFilter(
-      row.last_stories_filter ?? row.past,
-    ),
-    preferred_tone: String(row.preferred_tone ?? ""),
-    vocab_chunking: coerceVocabChunkingToBoolean(row.vocab_chunking),
-    app_theme: normalizeAppTheme(row.app_theme),
-  };
-}
-
-const EMPTY_PROFILE: UserSettingsProfile = {
-  username: "",
-  target_language: "",
-  native_language: "",
-  timezone: "",
-  difficulty: null,
-  word_target: null,
-  last_stories_filter: null,
-  preferred_tone: "",
-  vocab_chunking: false,
-  app_theme: "Light",
 };
 
 export async function SettingsPageContent({ searchParams }: PageProps) {
@@ -91,95 +20,38 @@ export async function SettingsPageContent({ searchParams }: PageProps) {
   const initialTab = parseSettingsTab(
     typeof params.tab === "string" ? params.tab : null,
   );
-  const clientMountKey = randomUUID();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getAuthenticatedUser();
 
-  let initialUser: UserSettingsProfile = EMPTY_PROFILE;
+  let initialUser: UserSettingsProfile = {
+    username: "",
+    target_language: "",
+    native_language: "",
+    timezone: "",
+    difficulty: null,
+    word_target: null,
+    last_stories_filter: null,
+    preferred_tone: "",
+    vocab_chunking: false,
+    app_theme: "Light",
+  };
+
+  let initialTopics: {
+    id: number | string;
+    topic_name: string;
+    active: boolean;
+  }[] = [];
 
   if (user) {
-    let userSettingsRow: Record<string, unknown> | null = null;
-
-    const byUserId = await supabase
-      .from("user_settings")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (byUserId.error) {
-      const msg = byUserId.error.message;
-      const missingUserIdCol =
-        /user_id/i.test(msg) &&
-        (/does not exist/i.test(msg) || /schema cache/i.test(msg));
-      if (!missingUserIdCol) {
-        console.error("[Settings] user_settings (user_id) error:", msg);
-      }
-    } else if (byUserId.data) {
-      userSettingsRow = byUserId.data as Record<string, unknown>;
-    }
-
-    if (!userSettingsRow) {
-      const byId = await supabase
-        .from("user_settings")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (byId.error) {
-        console.error(
-          "[Settings] user_settings (id) error:",
-          byId.error.message,
-        );
-      } else if (byId.data) {
-        userSettingsRow = byId.data as Record<string, unknown>;
-      }
-    }
-
-    if (userSettingsRow) {
-      initialUser = mapRowToUserProfile(userSettingsRow, "user_settings");
-    } else {
-      const usersRes = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (usersRes.error) {
-        console.error("[Settings] users query error:", usersRes.error.message);
-      }
-
-      if (usersRes.data) {
-        initialUser = mapRowToUserProfile(
-          usersRes.data as Record<string, unknown>,
-          "users",
-        );
-      }
-    }
+    initialUser = await loadUserSettingsProfile(supabase, user.id);
+    initialTopics = (await loadUserTopicsForSave(supabase, user.id)).map(
+      (t) => ({
+        id: t.id ?? t.topic_name,
+        topic_name: t.topic_name,
+        active: t.active,
+      }),
+    );
   }
-
-  let topicRows: { id: string; topic_name: string | null; active: boolean }[] | null =
-    null;
-  if (user) {
-    const res = await supabase
-      .from("user_topics")
-      .select("id, topic_name, active")
-      .eq("user_id", user.id)
-      .order("topic_name", { ascending: true });
-    if (res.error) {
-      console.error("[Settings] user_topics query error:", res.error.message);
-    }
-    topicRows = res.data;
-  }
-
-  const initialTopics =
-    topicRows?.map((t) => ({
-      id: String(t.id),
-      topic_name: t.topic_name ?? "",
-      active: !!t.active,
-    })) ?? [];
 
   type UsageCount = { key: string; count: number };
 
@@ -233,7 +105,7 @@ export async function SettingsPageContent({ searchParams }: PageProps) {
 
   return (
     <UserSettingsClient
-      key={user ? `${user.id}-${clientMountKey}` : "guest"}
+      key={user?.id ?? "guest"}
       initialUser={initialUser}
       initialTopics={initialTopics}
       initialTab={initialTab}

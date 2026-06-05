@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import {
   FilePenLine,
   Home,
@@ -26,6 +27,14 @@ const tabs: Tab[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    for (const { href } of tabs) {
+      router.prefetch(href);
+    }
+  }, [router]);
+
   if (pathname.startsWith("/login") || pathname.startsWith("/reader") || pathname.startsWith("/forgot-password") || pathname.startsWith("/auth/")) return null;
 
   return (

@@ -2,9 +2,9 @@
 
 import { Bookmark, ChevronDown, ListChecks } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getSupabase } from "@/lib/supabase";
+import type { StudyListItem } from "@/lib/load-study-items";
+import { useRapidReviewReportPending } from "@/lib/useActivityQueueProcessingTargets";
 import {
   SubNavTabBar,
   subNavTabButtonClass,
@@ -18,17 +18,7 @@ import {
   type SavedStudySortKey as SavedSortKey,
 } from "./saved-sort";
 
-type StudyItem = {
-  id: string;
-  vocab: string;
-  example_sentences: string | null;
-  definition: string | null;
-  translation: string | null;
-  archived: boolean | null;
-  date_added: string | null;
-  last_used: string | null;
-  mastery_score: unknown;
-};
+type StudyItem = StudyListItem;
 
 const SAVED_SORT_LABELS: Record<SavedSortKey, string> = {
   /** Label for `study_items.last_used` (updated when you rate in rapid review). */
@@ -44,7 +34,7 @@ const SAVED_SORT_KEYS: SavedSortKey[] = [
 ];
 
 const vocabTabs = [
-  { id: "quick-review" as const, Icon: ListChecks, label: "Study" },
+  { id: "quick-review" as const, Icon: ListChecks, label: "Review" },
   { id: "saved" as const, Icon: Bookmark, label: "Saved" },
 ] as const;
 
@@ -58,11 +48,26 @@ type ReviewHubMode = "choose" | "rapid-review";
 
 type VocabReviewProps = {
   initialTab?: TabId;
+  initialSavedItems?: StudyItem[];
 };
 
-export function VocabReview({ initialTab }: VocabReviewProps) {
+function tabToParam(id: TabId): string {
+  return id === "quick-review" ? "review" : "saved";
+}
+
+function paramToTab(raw: string | null): TabId | null {
+  if (raw === "saved") return "saved";
+  if (raw === "review" || raw === "quick-review") return "quick-review";
+  return null;
+}
+
+export function VocabReview({
+  initialTab,
+  initialSavedItems,
+}: VocabReviewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const rapidReviewReportPending = useRapidReviewReportPending();
   const [activeTab, setActiveTab] = useState<TabId>(
     () => initialTab ?? "quick-review",
   );
@@ -70,34 +75,34 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
   const selectTab = useCallback(
     (id: TabId) => {
       setActiveTab(id);
-      router.replace(`/vocab?tab=${encodeURIComponent(id)}`, { scroll: false });
+      router.replace(`/vocab?tab=${encodeURIComponent(tabToParam(id))}`, {
+        scroll: false,
+      });
     },
     [router],
   );
 
   const enterImmersiveRapidReview = useCallback(() => {
     router.replace(
-      `/vocab?tab=quick-review&flow=${encodeURIComponent(RAPID_REVIEW_FLOW)}`,
+      `/vocab?tab=review&flow=${encodeURIComponent(RAPID_REVIEW_FLOW)}`,
       { scroll: false },
     );
   }, [router]);
 
   const exitImmersiveRapidReview = useCallback(() => {
-    router.replace("/vocab?tab=quick-review", { scroll: false });
+    router.replace("/vocab?tab=review", { scroll: false });
   }, [router]);
 
   const completePracticeToMomentum = useCallback(() => {
     router.replace("/continue", { scroll: false });
   }, [router]);
 
-  const [items, setItems] = useState<StudyItem[]>([]);
+  const [items, setItems] = useState<StudyItem[]>(() => initialSavedItems ?? []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportCsvError, setExportCsvError] = useState<string | null>(null);
-  const [rapidReviewReportPending, setRapidReviewReportPending] =
-    useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [archiveBusyId, setArchiveBusyId] = useState<string | null>(null);
   const [archiveActionError, setArchiveActionError] = useState<string | null>(
@@ -120,55 +125,7 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
   );
 
   useEffect(() => {
-    const supabase = getSupabase();
-    let mounted = true;
-    let channel: RealtimeChannel | null = null;
-
-    async function refreshRapidReviewPending(userId: string) {
-      const { data } = await supabase
-        .from("activity_queue")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("event_type", "rapid_review_complete")
-        .in("status", ["pending", "processing"]);
-      if (mounted) {
-        setRapidReviewReportPending(
-          Array.isArray(data) && data.length > 0,
-        );
-      }
-    }
-
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { id: string } | null } }) => {
-      if (!mounted) return;
-      if (!user) {
-        setRapidReviewReportPending(false);
-        return;
-      }
-      void refreshRapidReviewPending(user.id);
-      channel = supabase
-        .channel("vocab_rapid_review_report_pending")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "activity_queue",
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            void refreshRapidReviewPending(user.id);
-          },
-        )
-        .subscribe();
-    });
-
-    return () => {
-      mounted = false;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
+    if (activeTab !== "saved" || initialSavedItems) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -192,17 +149,15 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
         }
       }
     }
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeTab, initialSavedItems]);
 
   useEffect(() => {
-    const t = searchParams.get("tab");
-    if (t === "saved" || t === "quick-review") {
-      setActiveTab(t);
-    }
+    const t = paramToTab(searchParams.get("tab"));
+    if (t) setActiveTab(t);
   }, [searchParams]);
 
   const flowParam = searchParams.get("flow");
@@ -482,31 +437,31 @@ export function VocabReview({ initialTab }: VocabReviewProps) {
                     onClick={enterImmersiveRapidReview}
                     disabled={rapidReviewReportPending}
                     className={[
-                      "inline-flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full border px-4 py-3 text-center shadow-sm transition-colors sm:min-w-[10rem] sm:flex-initial",
+                      "inline-flex w-full flex-col items-center justify-center gap-0.5 rounded-2xl border px-4 py-3.5 text-center shadow-sm transition-colors sm:max-w-sm",
                       rapidReviewReportPending
                         ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] opacity-90"
-                        : "border-[var(--border-default)] bg-[var(--field-bg)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)]",
+                        : "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] hover:opacity-90",
                     ].join(" ")}
                   >
                     <span
                       className={
                         rapidReviewReportPending
-                          ? "text-sm font-medium text-[var(--field-placeholder)]"
-                          : "text-sm font-medium text-[var(--foreground)]"
+                          ? "text-sm font-semibold text-[var(--field-placeholder)]"
+                          : "text-sm font-semibold text-[var(--nav-active-fg)]"
                       }
                     >
-                      {rapidReviewReportPending ? "Processing…" : "Rapid review"}
+                      {rapidReviewReportPending ? "Processing…" : "Start review"}
                     </span>
                     <span
                       className={
                         rapidReviewReportPending
                           ? "text-xs font-normal text-[var(--field-placeholder)]"
-                          : "text-xs font-normal text-[var(--text-muted)]"
+                          : "text-xs font-normal text-[var(--nav-active-fg)]/80"
                       }
                     >
                       {rapidReviewReportPending
                         ? "Last session is still syncing"
-                        : "Review up to 10 words"}
+                        : "Up to 10 words · tap to begin"}
                     </span>
                   </button>
                 </div>

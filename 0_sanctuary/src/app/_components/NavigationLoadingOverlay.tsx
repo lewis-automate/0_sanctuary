@@ -2,9 +2,11 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const EASE_SOFT = [0.83, 0, 0.17, 1] as const;
+/** Skip overlay on fast navigations (e.g. prefetched tab switches). */
+const OVERLAY_DELAY_MS = 150;
 
 /** Fired when in-app navigation was cancelled (e.g. Stay on unsaved settings) so the loading blur clears. */
 export const CANCEL_PENDING_NAVIGATION_EVENT = "sanctuary:cancel-pending-navigation";
@@ -19,10 +21,29 @@ function NavigationLoadingOverlayInner() {
   const searchKey = searchParams.toString();
   const [pending, setPending] = useState(false);
   const reduceMotion = useReducedMotion();
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearShowTimer = () => {
+    if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
+    }
+  };
+
+  const schedulePending = () => {
+    clearShowTimer();
+    showTimerRef.current = setTimeout(() => {
+      showTimerRef.current = null;
+      setPending(true);
+    }, OVERLAY_DELAY_MS);
+  };
 
   useEffect(() => {
+    clearShowTimer();
     setPending(false);
   }, [pathname, searchKey]);
+
+  useEffect(() => () => clearShowTimer(), []);
 
   useEffect(() => {
     const onCancelPending = () => setPending(false);
@@ -64,10 +85,16 @@ function NavigationLoadingOverlayInner() {
       ) {
         return;
       }
-      setPending(true);
+      schedulePending();
     };
 
-    const onPopState = () => setPending(true);
+    const onPopState = () => {
+      clearShowTimer();
+      // Back/forward must not show the overlay. On mobile, Next.js often commits
+      // the destination route before popstate; setting pending here leaves blur stuck
+      // because pathname will not change again.
+      setPending(false);
+    };
 
     document.addEventListener("click", onClickCapture, true);
     window.addEventListener("popstate", onPopState);

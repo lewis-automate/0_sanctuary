@@ -1,5 +1,6 @@
 import { ReaderContent } from "../_components/ReaderContent";
 import type { Story } from "../_data/stories";
+import { resolveAppThemePreference } from "@/lib/resolve-app-html-theme";
 import { getUserLanguagePair } from "@/lib/user-languages";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,12 +21,16 @@ export async function ReaderPageContent({ searchParams }: PageProps) {
     const langs = user
       ? await getUserLanguagePair(supabase, user.id)
       : { targetLanguage: "", nativeLanguage: "" };
+    const appTheme = user
+      ? await resolveAppThemePreference(supabase, user.id)
+      : undefined;
     return (
       <ReaderContent
         story={null}
         message="Pick a story from the library to read."
         targetLanguage={langs.targetLanguage}
         nativeLanguage={langs.nativeLanguage}
+        appTheme={appTheme}
       />
     );
   }
@@ -45,6 +50,7 @@ export async function ReaderPageContent({ searchParams }: PageProps) {
     supabase,
     user.id,
   );
+  const appTheme = await resolveAppThemePreference(supabase, user.id);
 
   const { data: row } = await supabase
     .from("stories")
@@ -70,6 +76,7 @@ export async function ReaderPageContent({ searchParams }: PageProps) {
       message={story ? undefined : "Story not found."}
       targetLanguage={targetLanguage}
       nativeLanguage={nativeLanguage}
+      appTheme={appTheme}
     />
   );
 }

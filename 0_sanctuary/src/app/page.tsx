@@ -9,7 +9,12 @@ type PageProps = {
 
 export default function HomePage({ searchParams }: PageProps) {
   return (
-    <FadeIn className="mx-auto w-full max-w-prose">
+    <FadeIn variant="tab" className="mx-auto w-full max-w-prose">
+      <header className="mb-3 text-center sm:text-left">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          Home
+        </p>
+      </header>
       <Suspense fallback={<PageLoading />}>
         <HomePageContent searchParams={searchParams} />
       </Suspense>

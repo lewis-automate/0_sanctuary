@@ -16,6 +16,9 @@ import {
   getUtcBoundsForMonth,
   getUserTimezone,
 } from "@/lib/user-timezone";
+import { resolveDailyPrimaryAction, type DailyPrimaryAction } from "@/lib/daily-hub";
+import { countUnreviewedFeedback } from "@/lib/load-feedback-items";
+import { resolveQuickReadHref } from "@/lib/quick-read";
 import { createClient } from "@/lib/supabase/server";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -27,11 +30,15 @@ type PageProps = {
   searchParams?: Promise<{ tab?: string }> | { tab?: string };
 };
 
+const PRODUCT_MIN_YEAR = 2026;
+
 async function loadHomeStats(
   supabase: SupabaseClient,
   userId: string,
+  accountCreatedAt: string | undefined,
 ): Promise<{
   quickReadHref: string;
+  dailyPrimaryAction: DailyPrimaryAction;
   stats: HomeStats;
   readingCalendar: ReadingCalendarModel;
   showUpEncouragement: ShowUpEncouragement | null;
@@ -48,9 +55,16 @@ async function loadHomeStats(
   const { startUtc: monthStartUtc, endUtc: monthEndUtc } =
     getUtcBoundsForMonth(todayYear, todayMonth, timeZone);
 
-  /** Earliest month in the navigator (product minimum). */
-  const minYear = 2026;
-  const minMonth = 1;
+  const accountStart = accountCreatedAt ? new Date(accountCreatedAt) : null;
+  const minYear = accountStart
+    ? Math.max(
+        PRODUCT_MIN_YEAR,
+        getCalendarYearInTimeZone(accountStart, timeZone),
+      )
+    : PRODUCT_MIN_YEAR;
+  const minMonth = accountStart
+    ? getCalendarMonthInTimeZone(accountStart, timeZone)
+    : 1;
   /** Up to 36 months ahead of “today” in the user’s timezone. */
   const maxNav = addCalendarMonths(todayYear, todayMonth, 36);
 
@@ -71,7 +85,7 @@ async function loadHomeStats(
     { data: monthProgressRows },
     { count: savedVocabTotal },
     { count: savedVocab30d },
-    { data: authorStoriesRows },
+    unreviewedFeedbackCount,
   ] = await Promise.all([
     supabase
       .from("user_progress")
@@ -92,32 +106,16 @@ async function loadHomeStats(
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("date_added", cutoffIso),
-    supabase
-      .from("stories")
-      .select("uuid")
-      .eq("original_author_id", userId)
-      .order("creation_date", { ascending: false }),
+    countUnreviewedFeedback(supabase, userId),
   ]);
 
   const rows = progressRows ?? [];
 
-  const readCountsByStory = new Map<string, number>();
-  for (const p of rows) {
-    if (p.stories_uuid) {
-      readCountsByStory.set(
-        p.stories_uuid,
-        (readCountsByStory.get(p.stories_uuid) ?? 0) + 1,
-      );
-    }
-  }
-
-  let quickReadHref: string = "/library";
-  for (const s of authorStoriesRows ?? []) {
-    if ((readCountsByStory.get(s.uuid) ?? 0) === 0) {
-      quickReadHref = `/reader?story=${encodeURIComponent(s.uuid)}`;
-      break;
-    }
-  }
+  let quickReadHref = await resolveQuickReadHref(supabase, userId);
+  const dailyPrimaryAction = resolveDailyPrimaryAction(
+    quickReadHref,
+    unreviewedFeedbackCount,
+  );
   const storyIds = Array.from(
     new Set(rows.map((p) => p.stories_uuid).filter(Boolean)),
   ) as string[];
@@ -180,8 +178,17 @@ async function loadHomeStats(
     userId,
   );
 
+  const initialMonthCounts: Record<string, number> = {};
+  for (const row of monthProgressRows ?? []) {
+    if (!row.reading_date) continue;
+    const key = formatDateKeyInTimeZone(row.reading_date, timeZone);
+    if (!key || key > todayDateKey) continue;
+    initialMonthCounts[key] = (initialMonthCounts[key] ?? 0) + 1;
+  }
+
   return {
     quickReadHref,
+    dailyPrimaryAction,
     stats,
     showUpEncouragement,
     readingCalendar: {
@@ -192,6 +199,7 @@ async function loadHomeStats(
       minMonth,
       maxYear: maxNav.year,
       maxMonth: maxNav.month,
+      initialMonthCounts,
     },
   };
 }
@@ -213,19 +221,19 @@ export async function HomePageContent({ searchParams }: PageProps) {
     redirect("/");
   }
 
-  const [welcomeName, { quickReadHref, stats, readingCalendar, showUpEncouragement }] =
-    await Promise.all([
+  const [welcomeName, homeData] = await Promise.all([
       resolveUserDisplayName(supabase, user),
-      loadHomeStats(supabase, user.id),
+      loadHomeStats(supabase, user.id, user.created_at),
     ]);
 
   return (
     <HomeDashboard
       welcomeName={welcomeName}
-      quickReadHref={quickReadHref}
-      stats={stats}
-      readingCalendar={readingCalendar}
-      showUpEncouragement={showUpEncouragement}
+      quickReadHref={homeData.quickReadHref}
+      dailyPrimaryAction={homeData.dailyPrimaryAction}
+      stats={homeData.stats}
+      readingCalendar={homeData.readingCalendar}
+      showUpEncouragement={homeData.showUpEncouragement}
     />
   );
 }

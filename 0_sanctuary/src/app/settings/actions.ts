@@ -1,5 +1,9 @@
 "use server";
 
+import {
+  loadUserSettingsProfile,
+  loadUserTopicsForSave,
+} from "@/lib/user-settings-profile";
 import { createClient } from "@/lib/supabase/server";
 
 export type UserSettingsProfile = {
@@ -100,5 +104,28 @@ export async function queueUserSettings(
   }
 
   return { ok: true };
+}
+
+export async function queueAppThemeToggle(
+  nextTheme: UserSettingsProfile["app_theme"],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
+  const profile = await loadUserSettingsProfile(supabase, user.id);
+  const topics = await loadUserTopicsForSave(supabase, user.id);
+
+  return queueUserSettings({
+    user_settings: { ...profile, app_theme: nextTheme },
+    upsert_topics: topics,
+    deleted_ids: [],
+    settings_trigger: "theme_toggle",
+  });
 }
 

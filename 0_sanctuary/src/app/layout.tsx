@@ -3,7 +3,7 @@ import { Cormorant_Garamond, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "./_components/AppShell";
 import { resolveDataAppTheme } from "@/lib/resolve-app-html-theme";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/get-user";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,10 +31,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getAuthenticatedUser();
   const dataAppTheme = user
     ? await resolveDataAppTheme(supabase, user.id)
     : "light";

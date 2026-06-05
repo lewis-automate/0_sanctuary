@@ -13,6 +13,7 @@ import {
   ReadingYearCalendar,
   type ReadingCalendarModel,
 } from "./_components/ReadingYearCalendar";
+import type { DailyPrimaryAction } from "@/lib/daily-hub";
 import type { ShowUpEncouragement } from "@/lib/show-up-encouragement";
 
 export type HomeStats = {
@@ -27,6 +28,7 @@ export type HomeStats = {
 type Props = {
   welcomeName: string;
   quickReadHref: string;
+  dailyPrimaryAction: DailyPrimaryAction;
   stats: HomeStats;
   readingCalendar: ReadingCalendarModel;
   showUpEncouragement: ShowUpEncouragement | null;
@@ -35,6 +37,7 @@ type Props = {
 export function HomeDashboard({
   welcomeName,
   quickReadHref,
+  dailyPrimaryAction,
   stats,
   readingCalendar,
   showUpEncouragement,
@@ -92,17 +95,38 @@ export function HomeDashboard({
           aria-label="Quick actions"
           className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-3.5"
         >
-          <div className="grid grid-cols-2 gap-2">
+          <div className="mb-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Do this next
+            </p>
             <Link
-              href={quickReadHref}
-              className={`${quickReadMainBtn} col-span-2`}
+              href={dailyPrimaryAction.href}
+              className={`${quickReadMainBtn} mt-2`}
             >
               <BookOpen
                 className="h-5 w-5 shrink-0 text-[var(--nav-active-fg)] opacity-95"
                 strokeWidth={2}
                 aria-hidden
               />
-              <span>Quick read</span>
+              <span>{dailyPrimaryAction.label}</span>
+            </Link>
+            <p className="mt-1.5 text-center text-xs text-[var(--text-muted)]">
+              {dailyPrimaryAction.hint}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-default)] pt-3">
+            <Link
+              href={quickReadHref}
+              className={`${quickActionBtn} col-span-2`}
+            >
+              <span className={quickActionIconCell}>
+                <BookOpen
+                  className={quickIconClass}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+              </span>
+              <span className={quickActionLabel}>Quick read</span>
             </Link>
             <QuickCreateStoryButton
               className={quickActionBtn}
@@ -138,7 +162,7 @@ export function HomeDashboard({
               <span className={quickActionLabel}>Review writing</span>
             </Link>
             <Link
-              href="/vocab?tab=quick-review&flow=rapid-review"
+              href="/vocab?tab=review&flow=rapid-review"
               className={quickActionBtn}
             >
               <span className={quickActionIconCell}>
