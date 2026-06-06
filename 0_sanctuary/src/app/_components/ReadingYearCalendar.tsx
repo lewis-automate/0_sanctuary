@@ -134,9 +134,11 @@ const CALENDAR_INTENSITY_CLASS: Record<1 | 2 | 3 | 4, string> = {
 
 type Props = {
   model: ReadingCalendarModel;
+  /** Month-to-date “you showed up” line for the current month. */
+  showUpSummary?: string | null;
 };
 
-export function ReadingYearCalendar({ model }: Props) {
+export function ReadingYearCalendar({ model, showUpSummary }: Props) {
   const {
     todayDateKey,
     initialYear,
@@ -283,6 +285,12 @@ export function ReadingYearCalendar({ model }: Props) {
         Reading calendar
       </h3>
 
+      {showUpSummary ? (
+        <p className="mb-2 text-xs leading-relaxed text-[var(--text-muted)] sm:text-sm">
+          {showUpSummary}
+        </p>
+      ) : null}
+
       <div className="mb-1 flex items-center gap-1.5">
         <button
           type="button"
@@ -386,22 +394,6 @@ export function ReadingYearCalendar({ model }: Props) {
           </>
         )}
       </p>
-
-      <div
-        className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-[var(--text-muted)] sm:text-[11px]"
-        aria-hidden
-      >
-        <span>Less</span>
-        <div className="flex items-center gap-0.5">
-          {([1, 2, 3, 4] as const).map((level) => (
-            <span
-              key={level}
-              className={`h-2.5 w-2.5 rounded-full ${CALENDAR_INTENSITY_CLASS[level]}`}
-            />
-          ))}
-        </div>
-        <span>More</span>
-      </div>
     </div>
   );
 }

@@ -6,7 +6,6 @@ import type { HomeStats } from "./HomeDashboard";
 import { resolveUserDisplayName } from "@/lib/resolve-user-display-name";
 import {
   buildShowUpEncouragement,
-  type ShowUpEncouragement,
 } from "@/lib/show-up-encouragement";
 import {
   addCalendarMonths,
@@ -16,8 +15,6 @@ import {
   getUtcBoundsForMonth,
   getUserTimezone,
 } from "@/lib/user-timezone";
-import { resolveDailyPrimaryAction, type DailyPrimaryAction } from "@/lib/daily-hub";
-import { countUnreviewedFeedback } from "@/lib/load-feedback-items";
 import { resolveQuickReadHref } from "@/lib/quick-read";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,10 +35,9 @@ async function loadHomeStats(
   accountCreatedAt: string | undefined,
 ): Promise<{
   quickReadHref: string;
-  dailyPrimaryAction: DailyPrimaryAction;
   stats: HomeStats;
   readingCalendar: ReadingCalendarModel;
-  showUpEncouragement: ShowUpEncouragement | null;
+  showUpSummary: string | null;
 }> {
   const timeZone = await getUserTimezone(supabase, userId);
   const now = new Date();
@@ -85,7 +81,6 @@ async function loadHomeStats(
     { data: monthProgressRows },
     { count: savedVocabTotal },
     { count: savedVocab30d },
-    unreviewedFeedbackCount,
   ] = await Promise.all([
     supabase
       .from("user_progress")
@@ -106,16 +101,11 @@ async function loadHomeStats(
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("date_added", cutoffIso),
-    countUnreviewedFeedback(supabase, userId),
   ]);
 
   const rows = progressRows ?? [];
 
-  let quickReadHref = await resolveQuickReadHref(supabase, userId);
-  const dailyPrimaryAction = resolveDailyPrimaryAction(
-    quickReadHref,
-    unreviewedFeedbackCount,
-  );
+  const quickReadHref = await resolveQuickReadHref(supabase, userId);
   const storyIds = Array.from(
     new Set(rows.map((p) => p.stories_uuid).filter(Boolean)),
   ) as string[];
@@ -188,9 +178,8 @@ async function loadHomeStats(
 
   return {
     quickReadHref,
-    dailyPrimaryAction,
     stats,
-    showUpEncouragement,
+    showUpSummary: showUpEncouragement?.summaryLine ?? null,
     readingCalendar: {
       todayDateKey,
       initialYear,
@@ -230,10 +219,9 @@ export async function HomePageContent({ searchParams }: PageProps) {
     <HomeDashboard
       welcomeName={welcomeName}
       quickReadHref={homeData.quickReadHref}
-      dailyPrimaryAction={homeData.dailyPrimaryAction}
       stats={homeData.stats}
       readingCalendar={homeData.readingCalendar}
-      showUpEncouragement={homeData.showUpEncouragement}
+      showUpSummary={homeData.showUpSummary}
     />
   );
 }

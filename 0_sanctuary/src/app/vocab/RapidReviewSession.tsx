@@ -455,7 +455,7 @@ export function RapidReviewSession({ onExit, onComplete }: Props) {
         {exitDialog}
         {topBar}
         <p className="text-[var(--text-muted)]">
-          No saved words yet. Add vocabulary below Rapid review first.
+          No saved words yet. Add vocabulary on the Add tab first.
         </p>
       </div>
     );

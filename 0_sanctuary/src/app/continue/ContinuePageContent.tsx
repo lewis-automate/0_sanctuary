@@ -55,7 +55,7 @@ export async function ContinuePageContent() {
           >
             Review vocab
           </Link>
-          <Link href="/writing?tab=thoughts" className={secondaryCtaBtn}>
+          <Link href="/writing?tab=written" className={secondaryCtaBtn}>
             Writing feedback
           </Link>
           {!hasNextStory ? null : (

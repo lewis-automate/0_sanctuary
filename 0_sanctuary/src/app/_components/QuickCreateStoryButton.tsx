@@ -9,9 +9,16 @@ type Props = {
   className: string;
   titleClassName: string;
   subClassName: string;
-  /** When true, only the title row is shown (pending state moves into the title). */
+  /** When true, title-only unless `compactSubtitle` is set. */
   compact?: boolean;
+  /** Shown in compact mode when provided (e.g. home action tile subtitle). */
+  compactSubtitle?: string;
+  /** Button label (default: Quick create). */
+  title?: string;
   leadingIcon?: ReactNode;
+  /** Vertical stacks icon, title, subtitle like home action tiles. */
+  layout?: "horizontal" | "vertical";
+  iconBadgeClassName?: string;
 };
 
 export function QuickCreateStoryButton({
@@ -19,7 +26,11 @@ export function QuickCreateStoryButton({
   titleClassName,
   subClassName,
   compact = false,
+  compactSubtitle,
+  title = "Quick create",
   leadingIcon,
+  layout = "horizontal",
+  iconBadgeClassName,
 }: Props) {
   const dialogTitleId = useId();
   const router = useRouter();
@@ -32,6 +43,10 @@ export function QuickCreateStoryButton({
 
   const btnPrimary =
     "rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-2.5 text-sm font-medium text-[var(--nav-active-fg)] transition-colors hover:opacity-90";
+
+  const isVertical = layout === "vertical";
+  const showCompactSubtitle = compact && compactSubtitle && !pending;
+  const showFullSubtitle = !compact;
 
   async function runQuickCreate() {
     setError(null);
@@ -46,32 +61,57 @@ export function QuickCreateStoryButton({
     }
   }
 
+  const iconWrapperClass = isVertical
+    ? iconBadgeClassName ??
+      "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--nav-idle-text)] ring-1 ring-[var(--border-default)] [&_svg]:block"
+    : "flex w-10 shrink-0 items-center justify-start self-stretch text-[var(--text-muted)] [&_svg]:block";
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-1">
       <button
         type="button"
-        className={`${className} h-full min-h-0 ${leadingIcon ? "gap-3" : "gap-2"}`}
+        className={[
+          className,
+          "h-full min-h-0",
+          isVertical
+            ? "flex-col items-start gap-2"
+            : leadingIcon
+              ? "gap-3"
+              : "gap-2",
+        ].join(" ")}
         onClick={() => setDialogOpen(true)}
         disabled={pending}
         aria-busy={pending}
       >
         {leadingIcon ? (
-          <span
-            className="flex w-10 shrink-0 items-center justify-start self-stretch text-[var(--text-muted)] [&_svg]:block"
-            aria-hidden
-          >
+          <span className={iconWrapperClass} aria-hidden>
             {leadingIcon}
           </span>
         ) : null}
-        <span className={titleClassName}>
-          {compact && pending ? "Queuing…" : "Quick create"}
-        </span>
-        {compact ? null : (
-          <span className={subClassName}>
-            {pending
-              ? "Queuing…"
-              : "Generate a passage using your current settings"}
+        {isVertical ? (
+          <span className="flex min-w-0 flex-col gap-0.5 text-left">
+            <span className={titleClassName}>
+              {compact && pending ? "Queuing…" : title}
+            </span>
+            {showCompactSubtitle ? (
+              <span className={subClassName}>{compactSubtitle}</span>
+            ) : pending && compact ? (
+              <span className={subClassName}>Queuing…</span>
+            ) : null}
           </span>
+        ) : (
+          <>
+            <span className={titleClassName}>
+              {compact && pending ? "Queuing…" : title}
+            </span>
+            {showFullSubtitle ? (
+              <span className={subClassName}>
+                {pending
+                  ? "Queuing…"
+                  : "Generate a passage using your current settings"}
+              </span>
+            ) : null}
+          </>
         )}
       </button>
       {error ? (

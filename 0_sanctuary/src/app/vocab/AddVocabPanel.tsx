@@ -88,7 +88,11 @@ function newEmptyRow(): VocabRow {
   return { id: crypto.randomUUID(), value: "" };
 }
 
-export function AddVocabPanel() {
+type AddVocabPanelProps = {
+  onWordsSaved?: () => void;
+};
+
+export function AddVocabPanel({ onWordsSaved }: AddVocabPanelProps = {}) {
   const titleId = useId();
   const lineIdPrefix = useId().replace(/:/g, "");
   const [rows, setRows] = useState<VocabRow[]>(() => [newEmptyRow()]);
@@ -159,6 +163,7 @@ export function AddVocabPanel() {
       setRows([newEmptyRow()]);
       setSaveDialogOpen(false);
       setSaveConfirmed(true);
+      onWordsSaved?.();
     } finally {
       setSaveBusy(false);
     }

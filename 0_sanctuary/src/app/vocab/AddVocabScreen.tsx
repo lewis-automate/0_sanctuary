@@ -3,20 +3,22 @@
 import { AddVocabPanel } from "./AddVocabPanel";
 
 type Props = {
-  /** `h1` on the standalone page; `h2` when nested under Vocab tabs. */
+  /** `h1` on the standalone page; `h2` when nested under another heading. */
   headingLevel?: 1 | 2;
-  /** Tighter spacing when shown under Study (below Rapid review). */
+  /** Tighter spacing when embedded in another section. */
   embedded?: boolean;
+  onWordsSaved?: () => void;
 };
 
-export function AddVocabScreen({ headingLevel = 1, embedded = false }: Props) {
+export function AddVocabScreen({
+  headingLevel = 1,
+  embedded = false,
+  onWordsSaved,
+}: Props) {
+  void headingLevel;
   return (
-    <div
-      className={
-        embedded ? "space-y-6 pt-2 pb-4" : "space-y-6 py-8"
-      }
-    >
-      <AddVocabPanel />
+    <div className={embedded ? "space-y-0" : "space-y-6 py-8"}>
+      <AddVocabPanel onWordsSaved={onWordsSaved} />
     </div>
   );
 }

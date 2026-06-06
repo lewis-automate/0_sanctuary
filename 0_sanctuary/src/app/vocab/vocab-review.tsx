@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronDown, ListChecks } from "lucide-react";
+import { Bookmark, ChevronDown, ListChecks, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StudyListItem } from "@/lib/load-study-items";
@@ -35,6 +35,7 @@ const SAVED_SORT_KEYS: SavedSortKey[] = [
 
 const vocabTabs = [
   { id: "quick-review" as const, Icon: ListChecks, label: "Review" },
+  { id: "add" as const, Icon: Plus, label: "Add" },
   { id: "saved" as const, Icon: Bookmark, label: "Saved" },
 ] as const;
 
@@ -52,11 +53,13 @@ type VocabReviewProps = {
 };
 
 function tabToParam(id: TabId): string {
-  return id === "quick-review" ? "review" : "saved";
+  if (id === "quick-review") return "review";
+  return id;
 }
 
 function paramToTab(raw: string | null): TabId | null {
   if (raw === "saved") return "saved";
+  if (raw === "add") return "add";
   if (raw === "review" || raw === "quick-review") return "quick-review";
   return null;
 }
@@ -123,6 +126,23 @@ export function VocabReview({
       sortSavedStudyItems(filteredSavedItems, savedSortKey, savedSortDirection),
     [filteredSavedItems, savedSortKey, savedSortDirection],
   );
+
+  const reloadSavedItems = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/study-items");
+      if (!res.ok) {
+        throw new Error("Failed to load saved words");
+      }
+      const data = (await res.json()) as { items: StudyItem[] };
+      setItems(data.items ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (activeTab !== "saved" || initialSavedItems) return;
@@ -227,20 +247,18 @@ export function VocabReview({
       <div
         className={immersivePractice ? "min-h-[85dvh] py-2" : "min-h-[50vh] py-2"}
       >
+        {activeTab === "add" && (
+          <section
+            aria-label="Add vocabulary"
+            className="text-sm text-[var(--prose-text)]"
+          >
+            <AddVocabScreen onWordsSaved={() => void reloadSavedItems()} />
+          </section>
+        )}
+
         {activeTab === "saved" && (
           <section aria-label="Saved words" className="space-y-4 text-sm text-[var(--prose-text)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <button
-                type="button"
-                onClick={downloadStudyItemsCsv}
-                disabled={exportingCsv}
-                className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-4 py-2 text-xs font-semibold text-[var(--field-text)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {exportingCsv ? "Exporting…" : "Export to CSV"}
-              </button>
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
               {SAVED_SORT_KEYS.map((key) => (
                 <button
                   key={key}
@@ -272,7 +290,7 @@ export function VocabReview({
               ))}
             </div>
 
-            <div className="mt-2">
+            <div>
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
                 <input
                   type="checkbox"
@@ -282,6 +300,17 @@ export function VocabReview({
                 />
                 Show archived
               </label>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={downloadStudyItemsCsv}
+                disabled={exportingCsv}
+                className="inline-flex shrink-0 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] px-4 py-2 text-xs font-semibold text-[var(--field-text)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {exportingCsv ? "Exporting…" : "Export to CSV"}
+              </button>
             </div>
 
             {exportCsvError && (
@@ -311,111 +340,101 @@ export function VocabReview({
                 const isExpanded = expandedId === item.id;
                 const archived = item.archived === true;
                 const archiveBusy = archiveBusyId === item.id;
+                const toggleExpanded = () =>
+                  setExpandedId(isExpanded ? null : item.id);
                 return (
                   <li key={item.id} className="flex flex-col">
                     <div
                       className={[
-                        "flex flex-col transition-colors",
+                        "transition-colors",
                         isExpanded
                           ? "bg-[var(--nav-hover-bg)]"
                           : "hover:bg-[var(--nav-hover-bg)]",
                       ].join(" ")}
                     >
-                      <div className="space-y-2 px-4 pt-3">
-                        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedId(isExpanded ? null : item.id)
-                            }
-                            className="flex min-w-0 text-left"
-                          >
-                            <span className="flex min-w-0 items-baseline gap-1.5">
-                              <span className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                                {item.vocab}
-                              </span>
-                              {archived ? (
-                                <span className="shrink-0 text-xs font-normal text-[var(--text-muted)]">
-                                  (archived)
-                                </span>
-                              ) : null}
+                      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5">
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? "Collapse details" : "Expand details"}
+                          onClick={toggleExpanded}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--field-placeholder)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
+                        >
+                          <ChevronDown
+                            strokeWidth={2}
+                            className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                            aria-hidden
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggleExpanded}
+                          className="min-w-0 text-left"
+                        >
+                          <span className="flex min-w-0 items-baseline gap-1.5">
+                            <span className="min-w-0 truncate font-medium text-[var(--foreground)]">
+                              {item.vocab}
                             </span>
-                          </button>
-                          <div className="relative z-[1] flex max-w-[11rem] flex-col gap-1 border-l border-[var(--border-default)] pl-2">
-                            <label
-                              className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium leading-none text-[var(--foreground)] ${archiveBusy ? "pointer-events-none opacity-60" : ""}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={archived}
-                                disabled={archiveBusy}
-                                onChange={(e) => {
-                                  void setItemArchived(item.id, e.target.checked);
-                                }}
-                                className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-2 focus:ring-[var(--nav-active-bg)] focus:ring-offset-1 focus:ring-offset-[var(--surface-panel)] disabled:opacity-60"
-                                title={archived ? "Unarchive" : "Archive"}
-                              />
-                              <span>Archive</span>
-                            </label>
-                            <p className="text-[0.65rem] leading-tight text-[var(--text-muted)]">
-                              Mastery{" "}
-                              <span className="tabular-nums font-semibold text-[var(--foreground)]">
-                                {formatMasteryScore(item.mastery_score)}
+                            {archived ? (
+                              <span className="shrink-0 text-xs font-normal text-[var(--text-muted)]">
+                                (archived)
                               </span>
-                            </p>
-                          </div>
-                        </div>
-                        {item.example_sentences ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setExpandedId(isExpanded ? null : item.id)
-                            }
-                            className="w-full text-left"
+                            ) : null}
+                          </span>
+                        </button>
+                        <div className="relative z-[1] flex max-w-[9.5rem] flex-col gap-0.5 border-l border-[var(--border-default)] pl-2">
+                          <label
+                            className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium leading-none text-[var(--foreground)] ${archiveBusy ? "pointer-events-none opacity-60" : ""}`}
                           >
-                            <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
-                              {item.example_sentences}
-                            </p>
-                          </button>
-                        ) : null}
+                            <input
+                              type="checkbox"
+                              checked={archived}
+                              disabled={archiveBusy}
+                              onChange={(e) => {
+                                void setItemArchived(item.id, e.target.checked);
+                              }}
+                              className="h-4 w-4 shrink-0 rounded border-[var(--border-strong)] accent-[var(--nav-active-bg)] focus:ring-2 focus:ring-[var(--nav-active-bg)] focus:ring-offset-1 focus:ring-offset-[var(--surface-panel)] disabled:opacity-60"
+                              title={archived ? "Unarchive" : "Archive"}
+                            />
+                            <span>Archive</span>
+                          </label>
+                          <p className="text-[0.65rem] leading-tight text-[var(--text-muted)]">
+                            Mastery{" "}
+                            <span className="tabular-nums font-semibold text-[var(--foreground)]">
+                              {formatMasteryScore(item.mastery_score)}
+                            </span>
+                          </p>
+                        </div>
                       </div>
 
                       {isExpanded ? (
-                        <div className="space-y-1 border-t border-[var(--border-default)] px-4 pb-2 pt-2 text-xs text-[var(--text-muted)]">
-                          {item.definition && (
+                        <div className="space-y-1.5 border-t border-[var(--border-default)] px-3 pb-2.5 pt-2 text-xs text-[var(--text-muted)]">
+                          {item.example_sentences ? (
+                            <p>
+                              <span className="font-semibold text-[var(--foreground)]">
+                                Example:
+                              </span>{" "}
+                              {item.example_sentences}
+                            </p>
+                          ) : null}
+                          {item.definition ? (
                             <p>
                               <span className="font-semibold text-[var(--foreground)]">
                                 Definition:
                               </span>{" "}
                               {item.definition}
                             </p>
-                          )}
-                          {item.translation && (
+                          ) : null}
+                          {item.translation ? (
                             <p>
                               <span className="font-semibold text-[var(--foreground)]">
                                 Translation:
                               </span>{" "}
                               {item.translation}
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       ) : null}
-
-                      <button
-                        type="button"
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? "Collapse details" : "Expand details"}
-                        onClick={() =>
-                          setExpandedId(isExpanded ? null : item.id)
-                        }
-                        className="flex w-full items-center justify-center py-2 text-[var(--field-placeholder)] transition-colors hover:text-[var(--foreground)]"
-                      >
-                        <ChevronDown
-                          strokeWidth={2}
-                          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                          aria-hidden
-                        />
-                      </button>
                     </div>
                   </li>
                 );
@@ -430,45 +449,40 @@ export function VocabReview({
             className="space-y-6 text-sm text-[var(--prose-text)]"
           >
             {reviewHubMode === "choose" ? (
-              <>
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <button
-                    type="button"
-                    onClick={enterImmersiveRapidReview}
-                    disabled={rapidReviewReportPending}
-                    className={[
-                      "inline-flex w-full flex-col items-center justify-center gap-0.5 rounded-2xl border px-4 py-3.5 text-center shadow-sm transition-colors sm:max-w-sm",
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={enterImmersiveRapidReview}
+                  disabled={rapidReviewReportPending}
+                  className={[
+                    "inline-flex w-full flex-col items-center justify-center gap-0.5 rounded-2xl border px-4 py-3.5 text-center shadow-sm transition-colors sm:max-w-sm",
+                    rapidReviewReportPending
+                      ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] opacity-90"
+                      : "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] hover:opacity-90",
+                  ].join(" ")}
+                >
+                  <span
+                    className={
                       rapidReviewReportPending
-                        ? "cursor-not-allowed border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--field-placeholder)] opacity-90"
-                        : "border-[var(--border-strong)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] hover:opacity-90",
-                    ].join(" ")}
+                        ? "text-sm font-semibold text-[var(--field-placeholder)]"
+                        : "text-sm font-semibold text-[var(--nav-active-fg)]"
+                    }
                   >
-                    <span
-                      className={
-                        rapidReviewReportPending
-                          ? "text-sm font-semibold text-[var(--field-placeholder)]"
-                          : "text-sm font-semibold text-[var(--nav-active-fg)]"
-                      }
-                    >
-                      {rapidReviewReportPending ? "Processing…" : "Start review"}
-                    </span>
-                    <span
-                      className={
-                        rapidReviewReportPending
-                          ? "text-xs font-normal text-[var(--field-placeholder)]"
-                          : "text-xs font-normal text-[var(--nav-active-fg)]/80"
-                      }
-                    >
-                      {rapidReviewReportPending
-                        ? "Last session is still syncing"
-                        : "Up to 10 words · tap to begin"}
-                    </span>
-                  </button>
-                </div>
-                <div aria-label="Add vocabulary">
-                  <AddVocabScreen headingLevel={2} embedded />
-                </div>
-              </>
+                    {rapidReviewReportPending ? "Processing…" : "Start review"}
+                  </span>
+                  <span
+                    className={
+                      rapidReviewReportPending
+                        ? "text-xs font-normal text-[var(--field-placeholder)]"
+                        : "text-xs font-normal text-[var(--nav-active-fg)]/80"
+                    }
+                  >
+                    {rapidReviewReportPending
+                      ? "Last session is still syncing"
+                      : "Up to 10 words · tap to begin"}
+                  </span>
+                </button>
+              </div>
             ) : null}
             {reviewHubMode === "rapid-review" ? (
               <RapidReviewSession
@@ -481,7 +495,7 @@ export function VocabReview({
       </div>
 
       {!immersivePractice ? (
-        <SubNavTabBar ariaLabel="Study and saved">
+        <SubNavTabBar ariaLabel="Vocab">
           {vocabTabs.map((tab) => {
             const isActive = tab.id === activeTab;
             const Icon = tab.Icon;

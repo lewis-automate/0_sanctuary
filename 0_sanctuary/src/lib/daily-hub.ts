@@ -25,7 +25,7 @@ export function resolveDailyPrimaryAction(
         : `${unreviewedFeedbackCount} pieces of feedback`;
     return {
       label: "Review writing",
-      href: "/writing?tab=thoughts",
+      href: "/writing?tab=written",
       hint: `${n} to read`,
     };
   }

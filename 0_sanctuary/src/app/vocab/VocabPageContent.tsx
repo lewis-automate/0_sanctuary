@@ -3,10 +3,11 @@ import { loadStudyItems } from "@/lib/load-study-items";
 import { getAuthenticatedUser } from "@/lib/supabase/get-user";
 import { VocabReview } from "./vocab-review";
 
-export type VocabTabId = "saved" | "quick-review";
+export type VocabTabId = "saved" | "add" | "quick-review";
 
 function parseVocabTab(raw: string): VocabTabId | undefined {
   if (raw === "saved") return "saved";
+  if (raw === "add") return "add";
   if (raw === "review" || raw === "quick-review") return "quick-review";
   return undefined;
 }
@@ -19,10 +20,6 @@ export async function VocabPageContent({ searchParams }: PageProps) {
   const params =
     searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const raw = typeof params.tab === "string" ? params.tab : "";
-
-  if (raw === "add") {
-    redirect("/vocab?tab=review");
-  }
 
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) redirect("/login");

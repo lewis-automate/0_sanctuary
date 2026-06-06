@@ -3,10 +3,10 @@ import { getAuthenticatedUser } from "@/lib/supabase/get-user";
 import { redirect } from "next/navigation";
 import { WritingTabs } from "./WritingTabs";
 
-type TabId = "thoughts" | "write-now";
+type TabId = "written" | "write-now";
 
 function parseWritingTab(raw: string): TabId | undefined {
-  if (raw === "thoughts") return "thoughts";
+  if (raw === "written" || raw === "thoughts") return "written";
   if (raw === "write-now" || raw === "writenow") return "write-now";
   return undefined;
 }

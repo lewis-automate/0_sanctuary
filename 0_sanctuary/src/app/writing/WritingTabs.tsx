@@ -12,19 +12,19 @@ import type { FeedbackListItem } from "@/lib/load-feedback-items";
 import { FeedbackSection } from "./FeedbackSection";
 
 const tabs = [
-  { id: "thoughts" as const, Icon: NotebookText, label: "Thoughts" },
+  { id: "written" as const, Icon: NotebookText, label: "Written" },
   { id: "write-now" as const, Icon: SquarePen, label: "Write now" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
 
 function tabToSearchParam(id: TabId): string {
-  return id === "write-now" ? "write-now" : "thoughts";
+  return id === "write-now" ? "write-now" : "written";
 }
 
 function searchParamToTab(raw: string | null): TabId | null {
   if (raw === "write-now" || raw === "writenow") return "write-now";
-  if (raw === "thoughts") return "thoughts";
+  if (raw === "written" || raw === "thoughts") return "written";
   return null;
 }
 
@@ -37,7 +37,7 @@ export function WritingTabs({ initialTab, initialFeedbackItems }: WritingTabsPro
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>(
-    () => initialTab ?? "thoughts",
+    () => initialTab ?? "written",
   );
 
   const selectTab = useCallback(
@@ -56,7 +56,7 @@ export function WritingTabs({ initialTab, initialFeedbackItems }: WritingTabsPro
   return (
     <>
       <div className="min-h-0 py-2 pb-4">
-        {activeTab === "thoughts" && (
+        {activeTab === "written" && (
           <>
             <p className="mb-4 text-center text-sm italic leading-relaxed text-[var(--text-muted)]">
               Read notes on your writing, then mark each piece reviewed when
@@ -68,7 +68,7 @@ export function WritingTabs({ initialTab, initialFeedbackItems }: WritingTabsPro
         {activeTab === "write-now" && <FreeWriterPanel />}
       </div>
 
-      <SubNavTabBar ariaLabel="Thoughts and write now">
+      <SubNavTabBar ariaLabel="Written and write now">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;
           const Icon = tab.Icon;

@@ -74,27 +74,72 @@ function caretOffsetFromPoint(
   clientX: number,
   clientY: number,
 ): number | null {
-  let range: Range | null = null;
   const doc = root.ownerDocument;
-  if (doc.caretRangeFromPoint) {
-    range = doc.caretRangeFromPoint(clientX, clientY);
-  } else {
-    const pos = (
-      doc as Document & {
-        caretPositionFromPoint?: (
-          x: number,
-          y: number,
-        ) => { offsetNode: Node; offset: number } | null;
+  const tryPoint = (x: number, y: number): number | null => {
+    let range: Range | null = null;
+    if (doc.caretRangeFromPoint) {
+      range = doc.caretRangeFromPoint(x, y);
+    } else {
+      const pos = (
+        doc as Document & {
+          caretPositionFromPoint?: (
+            px: number,
+            py: number,
+          ) => { offsetNode: Node; offset: number } | null;
+        }
+      ).caretPositionFromPoint?.(x, y);
+      if (pos) {
+        range = doc.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
       }
-    ).caretPositionFromPoint?.(clientX, clientY);
-    if (pos) {
-      range = doc.createRange();
-      range.setStart(pos.offsetNode, pos.offset);
-      range.collapse(true);
+    }
+    if (!range || !root.contains(range.startContainer)) return null;
+    return getTextOffsetInElement(root, range.startContainer, range.startOffset);
+  };
+
+  const nudges: Array<[number, number]> = [
+    [clientX, clientY],
+    [clientX, clientY - 6],
+    [clientX, clientY + 6],
+    [clientX - 4, clientY],
+    [clientX + 4, clientY],
+  ];
+  for (const [x, y] of nudges) {
+    const offset = tryPoint(x, y);
+    if (offset !== null) return offset;
+  }
+  return estimateOffsetFromPoint(root, clientX, clientY);
+}
+
+/** Rough fallback when caret APIs fail on quick mobile taps. */
+function estimateOffsetFromPoint(
+  root: HTMLElement,
+  clientX: number,
+  clientY: number,
+): number | null {
+  const text = root.textContent ?? "";
+  if (!text.length) return null;
+
+  const range = root.ownerDocument.createRange();
+  range.selectNodeContents(root);
+  const rects = [...range.getClientRects()];
+  if (!rects.length) return null;
+
+  let lineRect = rects[0]!;
+  let bestDist = Infinity;
+  for (const rect of rects) {
+    const midY = rect.top + rect.height / 2;
+    const dist = Math.abs(clientY - midY);
+    if (dist < bestDist) {
+      bestDist = dist;
+      lineRect = rect;
     }
   }
-  if (!range || !root.contains(range.startContainer)) return null;
-  return getTextOffsetInElement(root, range.startContainer, range.startOffset);
+
+  if (lineRect.width <= 0) return null;
+  const ratio = Math.max(0, Math.min(1, (clientX - lineRect.left) / lineRect.width));
+  return Math.max(0, Math.min(text.length, Math.round(ratio * text.length)));
 }
 
 function expandToNearestWord(

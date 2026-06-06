@@ -68,13 +68,13 @@ function buildSelectionContext(storyBody: string, highlighted: string): string {
 }
 
 const TOOLBAR_CLUSTER =
-  "flex shrink-0 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-inner";
+  "flex shrink-0 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1.5 shadow-inner";
 
 const TOOLBAR_ICON_BTN =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
+  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
 
 const TOOLBAR_ACTION_BTN =
-  "inline-flex h-9 min-w-[2.75rem] shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] px-2.5 text-[11px] font-semibold tracking-wide text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
+  "inline-flex h-10 min-w-[3rem] shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] px-3 text-xs font-semibold tracking-wide text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
 
 const READER_HIGHLIGHT_CLASS =
   "rounded-sm bg-[var(--reader-selection-bg)] text-[var(--reader-selection-fg)]";
@@ -200,6 +200,9 @@ export function InteractiveStory({
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionDockRef = useRef<HTMLDivElement>(null);
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastWordTapRef = useRef<{ at: number; x: number; y: number } | null>(
+    null,
+  );
   const [portalReady, setPortalReady] = useState(false);
 
   const clearSelection = useCallback(() => {
@@ -252,6 +255,7 @@ export function InteractiveStory({
     const dismiss = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
       if (target && selectionDockRef.current?.contains(target)) return;
+      if (target && containerRef.current?.contains(target)) return;
       clearSelection();
     };
     document.addEventListener("mousedown", dismiss);
@@ -268,6 +272,52 @@ export function InteractiveStory({
     return () => window.clearTimeout(id);
   }, [vocabToast]);
 
+  const trySelectWordAtPoint = useCallback(
+    (
+      paragraphIndex: number,
+      clientX: number,
+      clientY: number,
+      paragraphEl: HTMLParagraphElement,
+      { requireStationaryTap = false }: { requireStationaryTap?: boolean } = {},
+    ) => {
+      const now = Date.now();
+      const last = lastWordTapRef.current;
+      if (
+        last &&
+        now - last.at < 450 &&
+        Math.hypot(clientX - last.x, clientY - last.y) < 8
+      ) {
+        return;
+      }
+
+      if (requireStationaryTap) {
+        const start = pointerStartRef.current;
+        if (!start) return;
+        const dx = clientX - start.x;
+        const dy = clientY - start.y;
+        if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD_PX) return;
+      }
+
+      const paragraphText = paragraphs[paragraphIndex];
+      if (!paragraphText) return;
+
+      const next = getTapSelectionInParagraph(
+        paragraphEl,
+        paragraphIndex,
+        paragraphText,
+        clientX,
+        clientY,
+        segmentLanguage,
+      );
+      if (!next) return;
+
+      lastWordTapRef.current = { at: now, x: clientX, y: clientY };
+      setSelection(next);
+      closeSlidePanels();
+    },
+    [paragraphs, segmentLanguage, closeSlidePanels],
+  );
+
   const handleParagraphPointerDown = useCallback(
     (e: React.PointerEvent<HTMLParagraphElement>) => {
       pointerStartRef.current = { x: e.clientX, y: e.clientY };
@@ -277,30 +327,46 @@ export function InteractiveStory({
 
   const handleParagraphPointerUp = useCallback(
     (paragraphIndex: number, e: React.PointerEvent<HTMLParagraphElement>) => {
-      const start = pointerStartRef.current;
-      pointerStartRef.current = null;
-      if (!start) return;
-      const dx = e.clientX - start.x;
-      const dy = e.clientY - start.y;
-      if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD_PX) return;
-
-      const paragraphText = paragraphs[paragraphIndex];
-      if (!paragraphText) return;
-
-      const next = getTapSelectionInParagraph(
-        e.currentTarget,
+      if (e.pointerType === "touch") return;
+      trySelectWordAtPoint(
         paragraphIndex,
-        paragraphText,
         e.clientX,
         e.clientY,
-        segmentLanguage,
+        e.currentTarget,
+        { requireStationaryTap: true },
       );
-      if (!next) return;
-
-      setSelection(next);
-      closeSlidePanels();
+      pointerStartRef.current = null;
     },
-    [paragraphs, segmentLanguage, closeSlidePanels],
+    [trySelectWordAtPoint],
+  );
+
+  const handleParagraphClick = useCallback(
+    (paragraphIndex: number, e: React.MouseEvent<HTMLParagraphElement>) => {
+      trySelectWordAtPoint(
+        paragraphIndex,
+        e.clientX,
+        e.clientY,
+        e.currentTarget,
+      );
+      pointerStartRef.current = null;
+    },
+    [trySelectWordAtPoint],
+  );
+
+  const handleParagraphTouchEnd = useCallback(
+    (paragraphIndex: number, e: React.TouchEvent<HTMLParagraphElement>) => {
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      trySelectWordAtPoint(
+        paragraphIndex,
+        touch.clientX,
+        touch.clientY,
+        e.currentTarget,
+        { requireStationaryTap: true },
+      );
+      pointerStartRef.current = null;
+    },
+    [trySelectWordAtPoint],
   );
 
   const handleNudgeSelectionLeft = useCallback(() => {
@@ -486,16 +552,18 @@ export function InteractiveStory({
       <div
         ref={containerRef}
         role="article"
-        className={`mt-8 select-none space-y-6 text-[var(--prose-text)] [-webkit-touch-callout:none] ${FONT_CLASSES[fontSize]}`}
+        className={`mt-8 select-none space-y-6 text-[var(--prose-text)] [-webkit-touch-callout:none] [touch-action:manipulation] ${FONT_CLASSES[fontSize]}`}
         onContextMenu={(e) => e.preventDefault()}
       >
         {paragraphs.map((paragraph, i) => (
           <p
             key={i}
             data-paragraph-index={i}
-            className="cursor-text"
+            className="cursor-text [touch-action:manipulation]"
             onPointerDown={handleParagraphPointerDown}
             onPointerUp={(e) => handleParagraphPointerUp(i, e)}
+            onTouchEnd={(e) => handleParagraphTouchEnd(i, e)}
+            onClick={(e) => handleParagraphClick(i, e)}
           >
             {renderParagraphText(paragraph, selection, i)}
           </p>
@@ -643,15 +711,15 @@ export function InteractiveStory({
                 <motion.div
                   key="reader-selection-dock"
                   ref={selectionDockRef}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 12 }}
-                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                  className="fixed inset-x-0 bottom-0 z-[55] mx-auto w-full max-w-md px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  className="fixed inset-x-0 bottom-0 z-[55] mx-auto w-full max-w-md"
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
                 >
-                  <div className="overflow-hidden rounded-t-2xl border border-[var(--reader-border-muted)] bg-[var(--reader-surface)] shadow-2xl backdrop-blur-xl">
+                  <div className="overflow-hidden rounded-t-2xl border border-b-0 border-[var(--reader-border-muted)] bg-[var(--reader-surface)] pb-[calc(env(safe-area-inset-bottom,0px)+2.75rem)] shadow-2xl backdrop-blur-xl">
                     <AnimatePresence initial={false}>
                       {grammarOpen && (
                         <motion.div
@@ -703,7 +771,7 @@ export function InteractiveStory({
                       )}
                     </AnimatePresence>
 
-                    <div className="flex justify-center p-2">
+                    <div className="flex justify-center px-3 pb-2 pt-2.5">
                       <div className="relative flex min-w-0 flex-wrap items-center justify-center gap-2">
                         <div className={TOOLBAR_CLUSTER}>
                           <button
@@ -717,10 +785,34 @@ export function InteractiveStory({
                             }}
                             className={TOOLBAR_ICON_BTN}
                           >
-                            <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+                            <ChevronLeft className="h-[1.35rem] w-[1.35rem]" strokeWidth={2} aria-hidden />
                           </button>
                         </div>
                         <div className={`${TOOLBAR_CLUSTER} flex flex-wrap items-center justify-center`}>
+                          <button
+                            type="button"
+                            disabled={!canGrammar}
+                            title={grammarDisabledTitle ?? "Grammar explanation"}
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (grammarOpen) {
+                                closeGrammarPanel();
+                                return;
+                              }
+                              void handleGrammar();
+                            }}
+                            className={`${TOOLBAR_ICON_BTN} ${
+                              grammarOpen
+                                ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                                : ""
+                            }`}
+                            aria-label="Grammar"
+                            aria-pressed={grammarOpen}
+                          >
+                            <Lightbulb className="h-[1.35rem] w-[1.35rem]" strokeWidth={2} aria-hidden />
+                          </button>
+                          <div className="w-1 shrink-0 self-stretch" aria-hidden />
                           <button
                             type="button"
                             title={
@@ -746,30 +838,6 @@ export function InteractiveStory({
                           <div className="w-1 shrink-0 self-stretch" aria-hidden />
                           <button
                             type="button"
-                            disabled={!canGrammar}
-                            title={grammarDisabledTitle ?? "Grammar explanation"}
-                            onPointerDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (grammarOpen) {
-                                closeGrammarPanel();
-                                return;
-                              }
-                              void handleGrammar();
-                            }}
-                            className={`${TOOLBAR_ICON_BTN} ${
-                              grammarOpen
-                                ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
-                                : ""
-                            }`}
-                            aria-label="Grammar"
-                            aria-pressed={grammarOpen}
-                          >
-                            <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
-                          </button>
-                          <div className="w-1 shrink-0 self-stretch" aria-hidden />
-                          <button
-                            type="button"
                             disabled={!canTranslate}
                             title={translateDisabledTitle ?? "Translate selection"}
                             onPointerDown={(e) => e.preventDefault()}
@@ -789,7 +857,7 @@ export function InteractiveStory({
                             aria-label="Translate"
                             aria-pressed={translateOpen}
                           >
-                            <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
+                            <Languages className="h-[1.35rem] w-[1.35rem]" strokeWidth={2} aria-hidden />
                           </button>
                         </div>
                         <div className={TOOLBAR_CLUSTER}>
@@ -804,7 +872,7 @@ export function InteractiveStory({
                             }}
                             className={TOOLBAR_ICON_BTN}
                           >
-                            <ChevronRight className="h-5 w-5" strokeWidth={2} aria-hidden />
+                            <ChevronRight className="h-[1.35rem] w-[1.35rem]" strokeWidth={2} aria-hidden />
                           </button>
                         </div>
                       </div>

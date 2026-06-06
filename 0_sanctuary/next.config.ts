@@ -10,11 +10,11 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: "/add-vocab", destination: "/vocab?tab=review", permanent: true },
+      { source: "/add-vocab", destination: "/vocab?tab=add", permanent: true },
       { source: "/writer", destination: "/writing?tab=write-now", permanent: true },
       {
         source: "/writing/practice/:feedbackId",
-        destination: "/writing?tab=thoughts",
+        destination: "/writing?tab=written",
         permanent: true,
       },
     ];

@@ -1,20 +1,19 @@
 "use client";
 
+import { BookOpen, ListChecks, NotebookText, Plus, SquarePen } from "lucide-react";
 import {
-  BookOpen,
-  FilePenLine,
-  ListChecks,
-  NotebookText,
-  Tag,
-} from "lucide-react";
-import Link from "next/link";
+  HomeActionTile,
+  homeActionTileSecondaryClass,
+  homeActionTileSecondaryIconBadgeClass,
+  homeActionTileSecondarySubtitleClass,
+  homeActionTileSecondaryTitleClass,
+  IconWithPlusBadge,
+} from "./_components/HomeActionTile";
 import { QuickCreateStoryButton } from "./_components/QuickCreateStoryButton";
 import {
   ReadingYearCalendar,
   type ReadingCalendarModel,
 } from "./_components/ReadingYearCalendar";
-import type { DailyPrimaryAction } from "@/lib/daily-hub";
-import type { ShowUpEncouragement } from "@/lib/show-up-encouragement";
 
 export type HomeStats = {
   wordsRead30d: number;
@@ -28,19 +27,17 @@ export type HomeStats = {
 type Props = {
   welcomeName: string;
   quickReadHref: string;
-  dailyPrimaryAction: DailyPrimaryAction;
   stats: HomeStats;
   readingCalendar: ReadingCalendarModel;
-  showUpEncouragement: ShowUpEncouragement | null;
+  showUpSummary: string | null;
 };
 
 export function HomeDashboard({
   welcomeName,
   quickReadHref,
-  dailyPrimaryAction,
   stats,
   readingCalendar,
-  showUpEncouragement,
+  showUpSummary,
 }: Props) {
   const colHeader =
     "text-right text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-muted)] sm:text-xs";
@@ -48,23 +45,6 @@ export function HomeDashboard({
     "text-left text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]";
   const statNum =
     "text-right text-base font-semibold tabular-nums text-[var(--foreground)] sm:text-lg";
-
-  const quickActionBtn =
-    "flex w-full min-h-[2.75rem] items-center justify-start gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-panel)] px-3 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-elevated)] active:bg-[var(--surface-elevated)]";
-
-  /** Full-width primary CTA for Quick read */
-  const quickReadMainBtn =
-    "flex w-full min-h-[3rem] items-center justify-center gap-3 rounded-2xl border border-[var(--border-strong)] bg-[var(--nav-active-bg)] px-4 py-3 text-sm font-semibold text-[var(--nav-active-fg)] shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-[0.995]";
-
-  /** Fixed-width column so icons share one vertical rhythm; label fills the rest. */
-  const quickActionIconCell =
-    "flex w-10 shrink-0 items-center justify-start self-stretch";
-
-  const quickActionLabel = "min-w-0 flex-1 text-left text-sm font-medium leading-snug";
-
-  const quickCreateTitle = quickActionLabel;
-
-  const quickIconClass = "h-4 w-4 shrink-0 text-[var(--nav-idle-text)]";
 
   /** Soft intro copy — italic body, relaxed for full sentences */
   const introText =
@@ -95,85 +75,59 @@ export function HomeDashboard({
           aria-label="Quick actions"
           className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-3.5"
         >
-          <div className="mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Do this next
-            </p>
-            <Link
-              href={dailyPrimaryAction.href}
-              className={`${quickReadMainBtn} mt-2`}
-            >
-              <BookOpen
-                className="h-5 w-5 shrink-0 text-[var(--nav-active-fg)] opacity-95"
-                strokeWidth={2}
-                aria-hidden
-              />
-              <span>{dailyPrimaryAction.label}</span>
-            </Link>
-            <p className="mt-1.5 text-center text-xs text-[var(--text-muted)]">
-              {dailyPrimaryAction.hint}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-default)] pt-3">
-            <Link
-              href={quickReadHref}
-              className={`${quickActionBtn} col-span-2`}
-            >
-              <span className={quickActionIconCell}>
-                <BookOpen
-                  className={quickIconClass}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </span>
-              <span className={quickActionLabel}>Quick read</span>
-            </Link>
+          <div className="grid grid-cols-2 gap-2">
             <QuickCreateStoryButton
-              className={quickActionBtn}
-              titleClassName={quickCreateTitle}
-              subClassName=""
+              className={homeActionTileSecondaryClass}
+              titleClassName={homeActionTileSecondaryTitleClass}
+              subClassName={homeActionTileSecondarySubtitleClass}
+              iconBadgeClassName={homeActionTileSecondaryIconBadgeClass}
+              layout="vertical"
               compact
-              leadingIcon={
-                <FilePenLine
-                  className={quickIconClass}
-                  strokeWidth={2}
-                  aria-hidden
-                />
+              title="Quick create passages"
+              compactSubtitle="Uses current settings"
+              leadingIcon={<IconWithPlusBadge />}
+            />
+            <HomeActionTile
+              variant="primary"
+              href={quickReadHref}
+              title="Read now"
+              subtitle="Continue your story"
+              icon={
+                <BookOpen className="h-5 w-5" strokeWidth={2} aria-hidden />
               }
             />
-            <Link href="/settings?tab=topics" className={quickActionBtn}>
-              <span className={quickActionIconCell}>
-                <Tag
-                  className={quickIconClass}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </span>
-              <span className={quickActionLabel}>Set new topic</span>
-            </Link>
-            <Link href="/writing?tab=thoughts" className={quickActionBtn}>
-              <span className={quickActionIconCell}>
-                <NotebookText
-                  className={quickIconClass}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </span>
-              <span className={quickActionLabel}>Review writing</span>
-            </Link>
-            <Link
+            <HomeActionTile
+              href="/vocab?tab=add"
+              title="Add vocab"
+              subtitle="Type words to save"
+              icon={
+                <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+              }
+            />
+            <HomeActionTile
               href="/vocab?tab=review&flow=rapid-review"
-              className={quickActionBtn}
-            >
-              <span className={quickActionIconCell}>
-                <ListChecks
-                  className={quickIconClass}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-              </span>
-              <span className={quickActionLabel}>Review vocab</span>
-            </Link>
+              title="Review vocab"
+              subtitle="Up to 10 words"
+              icon={
+                <ListChecks className="h-4 w-4" strokeWidth={2} aria-hidden />
+              }
+            />
+            <HomeActionTile
+              href="/writing?tab=write-now"
+              title="Free writing"
+              subtitle="Write without a prompt"
+              icon={
+                <SquarePen className="h-4 w-4" strokeWidth={2} aria-hidden />
+              }
+            />
+            <HomeActionTile
+              href="/writing?tab=written"
+              title="Review writing"
+              subtitle="Feedback on your writing"
+              icon={
+                <NotebookText className="h-4 w-4" strokeWidth={2} aria-hidden />
+              }
+            />
           </div>
         </section>
 
@@ -256,29 +210,14 @@ export function HomeDashboard({
           </table>
         </section>
 
-        {showUpEncouragement ? (
-          <section
-            aria-label="Your month so far"
-            className="rounded-3xl border border-[var(--border-default)]/80 bg-[var(--surface-panel)] px-4 py-3.5 sm:px-5 sm:py-4"
-          >
-            <p className="text-sm leading-relaxed text-[var(--foreground)]">
-              <span className="font-medium text-[var(--prose-text)]">
-                {showUpEncouragement.summaryLine}
-              </span>
-            </p>
-            <p
-              className={`${introText} mt-2 text-left sm:text-center`}
-            >
-              {showUpEncouragement.encouragement}
-            </p>
-          </section>
-        ) : null}
-
         <section
           aria-label="Reading calendar"
           className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-3 sm:p-4"
         >
-          <ReadingYearCalendar model={readingCalendar} />
+          <ReadingYearCalendar
+            model={readingCalendar}
+            showUpSummary={showUpSummary}
+          />
         </section>
       </div>
     </>

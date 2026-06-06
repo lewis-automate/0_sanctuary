@@ -43,34 +43,6 @@ export function FreeWriterPanel() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [submitConfirmed, setSubmitConfirmed] = useState(false);
-  const [practiceFocus, setPracticeFocus] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/feedback-items");
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          items?: {
-            reviewed: boolean;
-            focus_point: string | null;
-          }[];
-        };
-        const next = (data.items ?? []).find(
-          (item) => !item.reviewed && item.focus_point?.trim(),
-        );
-        if (!cancelled && next?.focus_point) {
-          setPracticeFocus(next.focus_point.trim());
-        }
-      } catch {
-        /* optional hint */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const panelTransition = shouldReduceMotion
     ? { duration: 0.18 * 1.3, ease: "easeOut" as const }
@@ -136,7 +108,7 @@ export function FreeWriterPanel() {
       }
       setSendDialogOpen(false);
       if (fullscreen) setFullscreen(false);
-      router.push("/writing?tab=thoughts");
+      router.push("/writing?tab=written");
     } finally {
       setSendBusy(false);
     }
@@ -179,16 +151,8 @@ export function FreeWriterPanel() {
           >
             {submitConfirmed ? (
               <StatusBanner variant="success" className="mb-4">
-                Sent. Check Thoughts for feedback when it&apos;s ready.
+                Sent. Check Written for feedback when it&apos;s ready.
               </StatusBanner>
-            ) : null}
-            {practiceFocus ? (
-              <div className="mb-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm leading-relaxed text-[var(--prose-text)]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Focus for this session
-                </p>
-                <p className="mt-1.5">{practiceFocus}</p>
-              </div>
             ) : null}
             <div className="mb-3 flex justify-center">
               <motion.button
