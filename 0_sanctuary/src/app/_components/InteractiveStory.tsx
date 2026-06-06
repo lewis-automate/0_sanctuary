@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages, Lightbulb } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,9 +14,12 @@ import { createPortal } from "react-dom";
 import type { Story } from "../_data/stories";
 import { queueProgressUpdate } from "../reader/actions";
 import {
+  getTapSelectionInParagraph,
   nudgeSelectionExpandRight,
   nudgeSelectionShrinkFromRight,
-} from "@/lib/nudge-text-selection";
+  withParagraphIndex,
+  type ReaderTextSelection,
+} from "@/lib/reader-custom-selection";
 import {
   isReaderGrammarSelectionWithinLimit,
   isReaderVocabSelectionWithinLimit,
@@ -32,6 +36,7 @@ const FONT_CLASSES: Record<FontSize, string> = {
 };
 
 const READER_AI_WAIT_HINT = "Wait a moment...";
+const TAP_MOVE_THRESHOLD_PX = 12;
 
 type Props = {
   story: Story;
@@ -62,18 +67,105 @@ function buildSelectionContext(storyBody: string, highlighted: string): string {
   return storyBody.slice(start, end).trim();
 }
 
-type TooltipState = {
-  text: string;
-} | null;
-
 const TOOLBAR_CLUSTER =
   "flex shrink-0 items-center rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-inner";
 
 const TOOLBAR_ICON_BTN =
-  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
 
-const TOOLBAR_SAVE_BTN =
-  "inline-flex h-10 min-w-[3.5rem] shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] px-3 text-xs font-semibold tracking-wide text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
+const TOOLBAR_ACTION_BTN =
+  "inline-flex h-9 min-w-[2.75rem] shrink-0 items-center justify-center rounded-full border border-[var(--reader-control-border)] bg-[var(--reader-control-bg)] px-2.5 text-[11px] font-semibold tracking-wide text-[var(--reader-control-icon)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-panel-solid)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[var(--reader-control-bg)]";
+
+const READER_HIGHLIGHT_CLASS =
+  "rounded-sm bg-[var(--reader-selection-bg)] text-[var(--reader-selection-fg)]";
+
+function renderParagraphText(
+  text: string,
+  selection: ReaderTextSelection | null,
+  paragraphIndex: number,
+) {
+  if (
+    !selection ||
+    selection.paragraphIndex !== paragraphIndex ||
+    selection.start >= selection.end
+  ) {
+    return text;
+  }
+  const before = text.slice(0, selection.start);
+  const highlighted = text.slice(selection.start, selection.end);
+  const after = text.slice(selection.end);
+  return (
+    <>
+      {before}
+      <mark className={READER_HIGHLIGHT_CLASS}>{highlighted}</mark>
+      {after}
+    </>
+  );
+}
+
+type SlidePanelProps = {
+  title: string;
+  highlight: string;
+  onClose: () => void;
+  loading: boolean;
+  loadingLabel: string;
+  error: string | null;
+  body: string | null;
+};
+
+function ReaderSlidePanelContent({
+  title,
+  highlight,
+  onClose,
+  loading,
+  loadingLabel,
+  error,
+  body,
+}: SlidePanelProps) {
+  return (
+    <div className="flex max-h-[min(45vh,28rem)] flex-col">
+        <div className="flex shrink-0 items-start justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {title}
+            </p>
+            {highlight ? (
+              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--text-muted)]">
+                “{highlight}”
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)]"
+          >
+            Close
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
+          {loading && (
+            <div className="space-y-1">
+              <p className="text-sm text-[var(--text-muted)]">{loadingLabel}</p>
+              <p className="text-xs text-[var(--field-placeholder)]">
+                {READER_AI_WAIT_HINT}
+              </p>
+            </div>
+          )}
+          {!loading && error && (
+            <p className="text-sm text-[var(--semantic-danger-inline)]">
+              {error}
+            </p>
+          )}
+          {!loading && !error && body && (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
+              {body}
+            </p>
+          )}
+        </div>
+    </div>
+  );
+}
 
 export function InteractiveStory({
   story,
@@ -82,14 +174,21 @@ export function InteractiveStory({
   nativeLanguage = "",
 }: Props) {
   const router = useRouter();
-  const [tooltip, setTooltip] = useState<TooltipState>(null);
+  const paragraphs = useMemo(() => story.body.split("\n\n"), [story.body]);
+  const segmentLanguage = story.language || targetLanguage;
+
+  const [selection, setSelection] = useState<ReaderTextSelection | null>(null);
   const [grammarOpen, setGrammarOpen] = useState(false);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarText, setGrammarText] = useState("");
   const [grammarError, setGrammarError] = useState<string | null>(null);
   const [grammarHighlight, setGrammarHighlight] = useState("");
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateLoading, setTranslateLoading] = useState(false);
+  const [translateText, setTranslateText] = useState("");
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  const [translateHighlight, setTranslateHighlight] = useState("");
   const [savedVocab, setSavedVocab] = useState<string[]>([]);
-  /** Floating toast after Save (not shown in the highlight toolbar) */
   const [vocabToast, setVocabToast] = useState<"saved" | "duplicate" | null>(
     null,
   );
@@ -100,34 +199,35 @@ export function InteractiveStory({
   const [saveError, setSaveError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectionDockRef = useRef<HTMLDivElement>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
-  useEffect(() => {
-    setPortalReady(true);
+  const clearSelection = useCallback(() => {
+    setSelection(null);
+    setGrammarOpen(false);
+    setGrammarError(null);
+    setTranslateOpen(false);
+    setTranslateError(null);
   }, []);
-
-  const showTooltipFromSelection = useCallback(() => {
-    requestAnimationFrame(() => {
-      const selection = window.getSelection();
-      if (!selection) return;
-      const text = selection.toString().trim();
-
-      const anchor = selection.anchorNode;
-      if (!text || !containerRef.current || !anchor || !containerRef.current.contains(anchor)) {
-        if (grammarOpen) return;
-        setTooltip(null);
-        return;
-      }
-
-      setTooltip({ text });
-    });
-  }, [grammarOpen]);
 
   const closeGrammarPanel = useCallback(() => {
     setGrammarOpen(false);
     setGrammarError(null);
-    requestAnimationFrame(() => showTooltipFromSelection());
-  }, [showTooltipFromSelection]);
+  }, []);
+
+  const closeTranslatePanel = useCallback(() => {
+    setTranslateOpen(false);
+    setTranslateError(null);
+  }, []);
+
+  const closeSlidePanels = useCallback(() => {
+    closeGrammarPanel();
+    closeTranslatePanel();
+  }, [closeGrammarPanel, closeTranslatePanel]);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const handleFinishedReading = useCallback(async () => {
     setSaveError(null);
@@ -148,24 +248,19 @@ export function InteractiveStory({
   }, [story.id, savedVocab, thoughts, difficulty, engagement, router]);
 
   useEffect(() => {
-    if (!tooltip) return;
+    if (!selection) return;
     const dismiss = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
       if (target && selectionDockRef.current?.contains(target)) return;
-      setGrammarOpen(false);
-      setGrammarError(null);
-      setTooltip(null);
-      window.getSelection()?.removeAllRanges();
+      clearSelection();
     };
-    const handleMouseDown = (e: MouseEvent) => dismiss(e);
-    const handleTouchStart = (e: TouchEvent) => dismiss(e);
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("touchstart", handleTouchStart, { passive: true });
+    document.addEventListener("mousedown", dismiss);
+    document.addEventListener("touchstart", dismiss, { passive: true });
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("mousedown", dismiss);
+      document.removeEventListener("touchstart", dismiss);
     };
-  }, [tooltip]);
+  }, [selection, clearSelection]);
 
   useEffect(() => {
     if (!vocabToast) return;
@@ -173,98 +268,137 @@ export function InteractiveStory({
     return () => window.clearTimeout(id);
   }, [vocabToast]);
 
-  // Touches that end on selection handles (common on Android) do not bubble
-  // touchend to the article, but selectionchange still fires when the range updates.
-  useEffect(() => {
-    let debounceId: ReturnType<typeof setTimeout> | undefined;
-    const onSelectionChange = () => {
-      if (debounceId !== undefined) clearTimeout(debounceId);
-      debounceId = setTimeout(() => {
-        debounceId = undefined;
-        showTooltipFromSelection();
-      }, 100);
-    };
-    document.addEventListener("selectionchange", onSelectionChange);
-    return () => {
-      document.removeEventListener("selectionchange", onSelectionChange);
-      if (debounceId !== undefined) clearTimeout(debounceId);
-    };
-  }, [showTooltipFromSelection]);
+  const handleParagraphPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLParagraphElement>) => {
+      pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    },
+    [],
+  );
 
-  // Desktop: selection is available on mouseup. Mobile: backup when touchend
-  // reaches the article (tap-to-select); drag handles rely on selectionchange.
-  const handleMouseUp = useCallback(() => {
-    showTooltipFromSelection();
-  }, [showTooltipFromSelection]);
+  const handleParagraphPointerUp = useCallback(
+    (paragraphIndex: number, e: React.PointerEvent<HTMLParagraphElement>) => {
+      const start = pointerStartRef.current;
+      pointerStartRef.current = null;
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD_PX) return;
 
-  const handleTouchEnd = useCallback(() => {
-    setTimeout(showTooltipFromSelection, 150);
-  }, [showTooltipFromSelection]);
+      const paragraphText = paragraphs[paragraphIndex];
+      if (!paragraphText) return;
+
+      const next = getTapSelectionInParagraph(
+        e.currentTarget,
+        paragraphIndex,
+        paragraphText,
+        e.clientX,
+        e.clientY,
+        segmentLanguage,
+      );
+      if (!next) return;
+
+      setSelection(next);
+      closeSlidePanels();
+    },
+    [paragraphs, segmentLanguage, closeSlidePanels],
+  );
 
   const handleNudgeSelectionLeft = useCallback(() => {
-    if (!containerRef.current) return;
-    nudgeSelectionShrinkFromRight(containerRef.current);
-    requestAnimationFrame(() => showTooltipFromSelection());
-  }, [showTooltipFromSelection]);
+    if (!selection) return;
+    const paragraphText = paragraphs[selection.paragraphIndex];
+    if (!paragraphText) return;
+    const nudged = nudgeSelectionShrinkFromRight(
+      paragraphText,
+      selection.start,
+      selection.end,
+    );
+    if (!nudged) {
+      clearSelection();
+      return;
+    }
+    setSelection(withParagraphIndex(nudged, selection.paragraphIndex));
+  }, [selection, paragraphs, clearSelection]);
 
   const handleNudgeSelectionRight = useCallback(() => {
-    if (!containerRef.current) return;
-    if (!nudgeSelectionExpandRight(containerRef.current)) return;
-    requestAnimationFrame(() => showTooltipFromSelection());
-  }, [showTooltipFromSelection]);
+    if (!selection) return;
+    const paragraphText = paragraphs[selection.paragraphIndex];
+    if (!paragraphText) return;
+    const nudged = nudgeSelectionExpandRight(
+      paragraphText,
+      selection.start,
+      selection.end,
+    );
+    if (!nudged) return;
+    setSelection(withParagraphIndex(nudged, selection.paragraphIndex));
+  }, [selection, paragraphs]);
 
   const handleSaveVocab = useCallback(() => {
-    if (!tooltip || !isReaderVocabSelectionWithinLimit(tooltip.text)) return;
-    const text = tooltip.text;
+    if (!selection || !isReaderVocabSelectionWithinLimit(selection.text)) return;
+    const text = selection.text;
     setSavedVocab((prev) => {
       if (prev.includes(text)) {
         queueMicrotask(() => {
           setVocabToast("duplicate");
-          window.getSelection()?.removeAllRanges();
-          setTooltip(null);
+          clearSelection();
         });
         return prev;
       }
       if (prev.length >= 15) return prev;
       queueMicrotask(() => {
         setVocabToast("saved");
-        window.getSelection()?.removeAllRanges();
-        setTooltip(null);
+        clearSelection();
       });
       return [...prev, text];
     });
-  }, [tooltip]);
+  }, [selection, clearSelection]);
 
   const handleRemoveVocab = useCallback((word: string) => {
     setSavedVocab((prev) => prev.filter((w) => w !== word));
   }, []);
 
+  const selectedText = selection?.text ?? "";
   const grammarSelectionWithinLimit = Boolean(
-    tooltip?.text && isReaderGrammarSelectionWithinLimit(tooltip.text),
+    selectedText && isReaderGrammarSelectionWithinLimit(selectedText),
   );
   const vocabSelectionWithinLimit = Boolean(
-    tooltip?.text && isReaderVocabSelectionWithinLimit(tooltip.text),
+    selectedText && isReaderVocabSelectionWithinLimit(selectedText),
   );
+  const translateSelectionWithinLimit = grammarSelectionWithinLimit;
   const canGrammar =
     Boolean(targetLanguage.trim() && nativeLanguage.trim()) &&
-    Boolean(tooltip?.text) &&
+    Boolean(selectedText) &&
     grammarSelectionWithinLimit;
+  const canTranslate =
+    Boolean(nativeLanguage.trim()) &&
+    Boolean(selectedText) &&
+    translateSelectionWithinLimit;
   const grammarDisabledTitle = !grammarSelectionWithinLimit
     ? `Selection too long for Grammar (max ${MAX_READER_GRAMMAR_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
     : !targetLanguage.trim() || !nativeLanguage.trim()
       ? "Add target and native language in Settings"
       : undefined;
+  const translateDisabledTitle = !translateSelectionWithinLimit
+    ? `Selection too long for Translate (max ${MAX_READER_GRAMMAR_SELECTION_GRAPHEMES} characters)—shorten with the arrows`
+    : !nativeLanguage.trim()
+      ? "Add native language in Settings"
+      : undefined;
   const selectionAlreadyInVocab = Boolean(
-    tooltip?.text && savedVocab.includes(tooltip.text),
+    selectedText && savedVocab.includes(selectedText),
   );
   const canSaveToVocab =
     vocabSelectionWithinLimit &&
     (savedVocab.length < 15 || selectionAlreadyInVocab);
+  const slidePanelOpen = grammarOpen || translateOpen;
 
   const handleGrammar = useCallback(async () => {
-    if (!tooltip?.text.trim() || !isReaderGrammarSelectionWithinLimit(tooltip.text))
+    if (
+      !selection?.text.trim() ||
+      !isReaderGrammarSelectionWithinLimit(selection.text)
+    )
       return;
-    const highlight = tooltip.text;
+    const highlight = selection.text;
+    setTranslateOpen(false);
+    setTranslateError(null);
     setGrammarHighlight(highlight);
     setGrammarOpen(true);
     setGrammarLoading(true);
@@ -300,19 +434,71 @@ export function InteractiveStory({
     } finally {
       setGrammarLoading(false);
     }
-  }, [story.body, tooltip]);
+  }, [story.body, selection]);
+
+  const handleTranslate = useCallback(async () => {
+    if (
+      !selection?.text.trim() ||
+      !isReaderGrammarSelectionWithinLimit(selection.text)
+    )
+      return;
+    const highlight = selection.text;
+    setGrammarOpen(false);
+    setGrammarError(null);
+    setTranslateHighlight(highlight);
+    setTranslateOpen(true);
+    setTranslateLoading(true);
+    setTranslateError(null);
+    setTranslateText("");
+    try {
+      const res = await fetch("/api/translate-selection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: highlight,
+          sourceLanguage: story.language,
+        }),
+      });
+      const data = (await res.json()) as {
+        translation?: unknown;
+        error?: string;
+      };
+      if (!res.ok) {
+        setTranslateError(data.error ?? "Translation failed");
+        return;
+      }
+      const raw =
+        typeof data.translation === "string" ? data.translation.trim() : "";
+      if (raw) {
+        setTranslateText(raw);
+      } else {
+        setTranslateError("No translation returned");
+      }
+    } catch {
+      setTranslateError("Could not reach translation service");
+    } finally {
+      setTranslateLoading(false);
+    }
+  }, [selection, story.language]);
 
   return (
     <>
       <div
         ref={containerRef}
         role="article"
-        className={`mt-8 select-text space-y-6 text-[var(--prose-text)] ${FONT_CLASSES[fontSize]}`}
-        onMouseUp={handleMouseUp}
-        onTouchEnd={handleTouchEnd}
+        className={`mt-8 select-none space-y-6 text-[var(--prose-text)] [-webkit-touch-callout:none] ${FONT_CLASSES[fontSize]}`}
+        onContextMenu={(e) => e.preventDefault()}
       >
-        {story.body.split("\n\n").map((paragraph, i) => (
-          <p key={i}>{paragraph}</p>
+        {paragraphs.map((paragraph, i) => (
+          <p
+            key={i}
+            data-paragraph-index={i}
+            className="cursor-text"
+            onPointerDown={handleParagraphPointerDown}
+            onPointerUp={(e) => handleParagraphPointerUp(i, e)}
+          >
+            {renderParagraphText(paragraph, selection, i)}
+          </p>
         ))}
       </div>
 
@@ -324,7 +510,7 @@ export function InteractiveStory({
           <div className="mt-2 flex flex-wrap gap-2 rounded-2xl border border-[var(--border-default)] bg-[var(--field-bg)] p-4">
             {savedVocab.length === 0 ? (
               <span className="text-sm text-[var(--field-placeholder)]">
-                Select words to save them here.
+                Tap words to save them here.
               </span>
             ) : (
               savedVocab.map((word) => (
@@ -433,9 +619,9 @@ export function InteractiveStory({
         createPortal(
           <>
             <AnimatePresence>
-              {grammarOpen && tooltip && (
+              {slidePanelOpen && selection && (
                 <motion.div
-                  key="reader-grammar-backdrop"
+                  key="reader-slide-backdrop"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -445,15 +631,15 @@ export function InteractiveStory({
                   <button
                     type="button"
                     className="absolute inset-0"
-                    aria-label="Close grammar panel"
-                    onClick={closeGrammarPanel}
+                    aria-label="Close panel"
+                    onClick={closeSlidePanels}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
 
             <AnimatePresence>
-              {tooltip && (
+              {selection && (
                 <motion.div
                   key="reader-selection-dock"
                   ref={selectionDockRef}
@@ -473,58 +659,52 @@ export function InteractiveStory({
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 36,
+                          }}
                           className="overflow-hidden border-b border-[var(--border-default)]"
                         >
-                          <div className="flex max-h-[min(45vh,28rem)] flex-col">
-                            <div className="flex shrink-0 items-start justify-between gap-3 px-4 py-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-[var(--foreground)]">
-                                  Grammar
-                                </p>
-                                {grammarHighlight ? (
-                                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[var(--text-muted)]">
-                                    “{grammarHighlight}”
-                                  </p>
-                                ) : null}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={closeGrammarPanel}
-                                className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)]"
-                              >
-                                Close
-                              </button>
-                            </div>
-                            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3">
-                              {grammarLoading && (
-                                <div className="space-y-1">
-                                  <p className="text-sm text-[var(--text-muted)]">
-                                    Getting a grammar note…
-                                  </p>
-                                  <p className="text-xs text-[var(--field-placeholder)]">
-                                    {READER_AI_WAIT_HINT}
-                                  </p>
-                                </div>
-                              )}
-                              {!grammarLoading && grammarError && (
-                                <p className="text-sm text-[var(--semantic-danger-inline)]">
-                                  {grammarError}
-                                </p>
-                              )}
-                              {!grammarLoading && !grammarError && grammarText && (
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--foreground)]">
-                                  {grammarText}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          <ReaderSlidePanelContent
+                            title="Grammar"
+                            highlight={grammarHighlight}
+                            onClose={closeGrammarPanel}
+                            loading={grammarLoading}
+                            loadingLabel="Getting a grammar note…"
+                            error={grammarError}
+                            body={grammarText}
+                          />
+                        </motion.div>
+                      )}
+                      {translateOpen && (
+                        <motion.div
+                          key="reader-translate-panel"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 36,
+                          }}
+                          className="overflow-hidden border-b border-[var(--border-default)]"
+                        >
+                          <ReaderSlidePanelContent
+                            title="Translate"
+                            highlight={translateHighlight}
+                            onClose={closeTranslatePanel}
+                            loading={translateLoading}
+                            loadingLabel="Translating…"
+                            error={translateError}
+                            body={translateText}
+                          />
                         </motion.div>
                       )}
                     </AnimatePresence>
 
                     <div className="flex justify-center p-2">
-                      <div className="relative flex min-w-0 items-center justify-center">
+                      <div className="relative flex min-w-0 flex-wrap items-center justify-center gap-2">
                         <div className={TOOLBAR_CLUSTER}>
                           <button
                             type="button"
@@ -540,8 +720,7 @@ export function InteractiveStory({
                             <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
                           </button>
                         </div>
-                        <div className="w-3 shrink-0 self-stretch" aria-hidden />
-                        <div className={`${TOOLBAR_CLUSTER} flex items-center`}>
+                        <div className={`${TOOLBAR_CLUSTER} flex flex-wrap items-center justify-center`}>
                           <button
                             type="button"
                             title={
@@ -559,12 +738,12 @@ export function InteractiveStory({
                               handleSaveVocab();
                             }}
                             disabled={!canSaveToVocab}
-                            className={TOOLBAR_SAVE_BTN}
+                            className={TOOLBAR_ACTION_BTN}
                             aria-label="Save to vocab list"
                           >
                             Save
                           </button>
-                          <div className="w-1.5 shrink-0 self-stretch" aria-hidden />
+                          <div className="w-1 shrink-0 self-stretch" aria-hidden />
                           <button
                             type="button"
                             disabled={!canGrammar}
@@ -578,7 +757,7 @@ export function InteractiveStory({
                               }
                               void handleGrammar();
                             }}
-                            className={`${TOOLBAR_SAVE_BTN} ${
+                            className={`${TOOLBAR_ICON_BTN} ${
                               grammarOpen
                                 ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
                                 : ""
@@ -586,10 +765,33 @@ export function InteractiveStory({
                             aria-label="Grammar"
                             aria-pressed={grammarOpen}
                           >
-                            Grammar
+                            <Lightbulb className="h-5 w-5" strokeWidth={2} aria-hidden />
+                          </button>
+                          <div className="w-1 shrink-0 self-stretch" aria-hidden />
+                          <button
+                            type="button"
+                            disabled={!canTranslate}
+                            title={translateDisabledTitle ?? "Translate selection"}
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (translateOpen) {
+                                closeTranslatePanel();
+                                return;
+                              }
+                              void handleTranslate();
+                            }}
+                            className={`${TOOLBAR_ICON_BTN} ${
+                              translateOpen
+                                ? "border-[var(--nav-active-bg)] bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)]"
+                                : ""
+                            }`}
+                            aria-label="Translate"
+                            aria-pressed={translateOpen}
+                          >
+                            <Languages className="h-5 w-5" strokeWidth={2} aria-hidden />
                           </button>
                         </div>
-                        <div className="w-3 shrink-0 self-stretch" aria-hidden />
                         <div className={TOOLBAR_CLUSTER}>
                           <button
                             type="button"
@@ -626,7 +828,7 @@ export function InteractiveStory({
                     transition: { duration: 0.28, ease: "easeIn" },
                   }}
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-none fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[60] flex max-w-[min(90vw,20rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-4 py-3 text-sm font-medium text-[var(--semantic-success-text)] shadow-lg shadow-black/10"
+                  className="pointer-events-none fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[60] flex max-w-[min(90vw,20rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-[var(--semantic-success-border)] bg-[var(--semantic-success-bg)] px-4 py-3 text-sm font-medium text-[var(--semantic-success-text)] shadow-lg shadow-black/10"
                 >
                   <span
                     className="h-2 w-2 shrink-0 rounded-full bg-[var(--semantic-success-icon)]"
@@ -646,4 +848,3 @@ export function InteractiveStory({
     </>
   );
 }
-

@@ -35,6 +35,8 @@ html[data-app-theme="light"] {
   --reader-surface: rgb(253 252 251 / 0.92);
   --reader-surface-solid: #fdfcfb;
   --reader-border-muted: rgb(255 255 255 / 0.4);
+  --reader-selection-bg: rgb(37 99 235 / 0.28);
+  --reader-selection-fg: inherit;
 
   /* Status & badges (soft paper in light) */
   --semantic-success-bg: #ecfdf5;
@@ -99,6 +101,8 @@ html[data-app-theme="dark"] {
   --reader-surface: rgb(30 35 44 / 0.96);
   --reader-surface-solid: #1e232c;
   --reader-border-muted: rgb(80 88 108 / 0.45);
+  --reader-selection-bg: rgb(59 130 246 / 0.38);
+  --reader-selection-fg: inherit;
 
   /* Status & badges (muted, no bright mint/cream blocks) */
   --semantic-success-bg: rgb(24 40 34 / 0.72);
