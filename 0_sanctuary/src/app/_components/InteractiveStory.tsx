@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Languages, Lightbulb } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages, Lightbulb, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -78,6 +78,17 @@ const TOOLBAR_ACTION_BTN =
 
 const READER_HIGHLIGHT_CLASS =
   "rounded-sm bg-[var(--reader-selection-bg)] text-[var(--reader-selection-fg)]";
+
+function selectionsEqual(
+  a: ReaderTextSelection,
+  b: ReaderTextSelection,
+): boolean {
+  return (
+    a.paragraphIndex === b.paragraphIndex &&
+    a.start === b.start &&
+    a.end === b.end
+  );
+}
 
 function renderParagraphText(
   text: string,
@@ -281,14 +292,6 @@ export function InteractiveStory({
       { requireStationaryTap = false }: { requireStationaryTap?: boolean } = {},
     ) => {
       const now = Date.now();
-      const last = lastWordTapRef.current;
-      if (
-        last &&
-        now - last.at < 450 &&
-        Math.hypot(clientX - last.x, clientY - last.y) < 8
-      ) {
-        return;
-      }
 
       if (requireStationaryTap) {
         const start = pointerStartRef.current;
@@ -309,13 +312,34 @@ export function InteractiveStory({
         clientY,
         segmentLanguage,
       );
-      if (!next) return;
+
+      if (!next) {
+        clearSelection();
+        lastWordTapRef.current = null;
+        return;
+      }
+
+      const last = lastWordTapRef.current;
+      const isDuplicateEvent =
+        last &&
+        now - last.at < 450 &&
+        Math.hypot(clientX - last.x, clientY - last.y) < 8;
+
+      if (isDuplicateEvent) {
+        return;
+      }
+
+      if (selection && selectionsEqual(selection, next)) {
+        clearSelection();
+        lastWordTapRef.current = { at: now, x: clientX, y: clientY };
+        return;
+      }
 
       lastWordTapRef.current = { at: now, x: clientX, y: clientY };
       setSelection(next);
       closeSlidePanels();
     },
-    [paragraphs, segmentLanguage, closeSlidePanels],
+    [paragraphs, segmentLanguage, closeSlidePanels, selection, clearSelection],
   );
 
   const handleParagraphPointerDown = useCallback(
@@ -773,6 +797,21 @@ export function InteractiveStory({
 
                     <div className="flex justify-center px-3 pb-2 pt-2.5">
                       <div className="relative flex min-w-0 flex-wrap items-center justify-center gap-2">
+                        <div className={TOOLBAR_CLUSTER}>
+                          <button
+                            type="button"
+                            title="Clear selection"
+                            aria-label="Clear selection"
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearSelection();
+                            }}
+                            className={TOOLBAR_ICON_BTN}
+                          >
+                            <X className="h-[1.35rem] w-[1.35rem]" strokeWidth={2} aria-hidden />
+                          </button>
+                        </div>
                         <div className={TOOLBAR_CLUSTER}>
                           <button
                             type="button"
